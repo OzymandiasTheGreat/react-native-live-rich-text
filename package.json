@@ -1,0 +1,42 @@
+{
+  "private": true,
+  "name": "react-native-live-rich-text",
+  "version": "0.1.0",
+  "description": "Drop-in replacement for TextInput that provides native WYSIWYG rich text editing",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "patch-package"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "react-native-live-rich-text"
+  ],
+  "author": {
+    "name": "Tomas Ravinskas",
+    "email": "tomas@tomasrav.me",
+    "url": "https://tomasrav.me/"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {},
+  "devDependencies": {
+    "@expensify/react-native-live-markdown": "^0.1.240",
+    "@types/react": "~18.3.12",
+    "expensify-common": "^2.0.118",
+    "expo": "~52.0.0",
+    "patch-package": "^8.0.0",
+    "react-native": "0.76.0",
+    "react-native-reanimated": "^3.17.1",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "@expensify/react-native-live-markdown": "*",
+    "expensify-common": "*",
+    "expo": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-reanimated": "*"
+  }
+}

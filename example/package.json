@@ -1,0 +1,27 @@
+{
+  "private": true,
+  "name": "react-native-live-rich-text-example",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "watchman watch-del .. && expo start --clear",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "@expensify/react-native-live-markdown": "^0.1.240",
+    "expensify-common": "^2.0.118",
+    "expo": "~52.0.37",
+    "react": "18.3.1",
+    "react-native": "0.76.7",
+    "react-native-reanimated": "^3.17.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~18.3.12",
+    "patch-package": "^8.0.0",
+    "typescript": "^5.3.3"
+  }
+}

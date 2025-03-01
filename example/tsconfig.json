@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "react-native-live-rich-text": ["../src/index"],
+      "react-native-live-rich-text/*": ["../src/*"]
+    }
+  }
+}
