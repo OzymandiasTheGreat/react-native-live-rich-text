@@ -55,13 +55,13 @@ export default function App() {
   const [format, setFormat] = useState<Set<DISPLAY_TYPE>>(new Set())
 
   const onChangeText = useCallback((text: string) => {
-    console.log("A1 CHANGE TEXT", text)
+    // console.log("A1 CHANGE TEXT", text)
     setText(text)
   }, [])
 
   const onSelectionChange = useCallback(
     (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      console.log("A2 CHANGE SELECTION", e.nativeEvent.selection)
+      // console.log("A2 CHANGE SELECTION", e.nativeEvent.selection)
       setSelection(e.nativeEvent.selection)
     },
     [],
@@ -121,6 +121,7 @@ export default function App() {
   }, [])
 
   const clear = useCallback(() => {
+    ref.current?.reset()
     setText("")
     setAttributes([])
     setFormat(new Set())

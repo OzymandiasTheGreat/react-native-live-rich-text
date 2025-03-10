@@ -26,14 +26,7 @@ export type Attribute = {
   content: string | null
 }
 
-export type TextState = { prev: string; next: string }
-
 export type TextInputSelection = TextInputSelectionChangeEventData["selection"]
-
-export type SelectionState = {
-  prev: TextInputSelection
-  next: TextInputSelection
-}
 
 export interface RichTextInputProps
   extends Omit<
@@ -49,6 +42,7 @@ export interface RichTextInputProps
 }
 
 export type RichTextInputRef = MarkdownTextInput & {
+  reset: () => void
   formatSelection: (type: DISPLAY_TYPE, content?: string | null) => void
   complete: (type: DISPLAY_TYPE, text: string, content?: string | null) => void
 }

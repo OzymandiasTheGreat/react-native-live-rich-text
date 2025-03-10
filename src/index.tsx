@@ -64,28 +64,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const typingAttributes = useSharedValue<DISPLAY_TYPE[]>([])
 
     useEffect(() => {
-      console.log("05 VALUE SETTER", valueProp)
-
+      // console.log("05 VALUE SETTER", valueProp)
       setValue(valueProp ?? "")
-
-      runOnRuntime(
-        getWorkletRuntime(),
-        (value?: string, attributes?: Attribute[]) => {
-          "worklet"
-
-          console.log("09 VALUE SETTER", { value, prev: sharedText.value })
-
-          if (value !== sharedText.value) {
-            appliedAttributes.value = attributes ?? []
-            typingAttributes.value = []
-            skipUpdate.value = true
-          }
-        },
-      )(valueProp, attributesProp)
-    }, [attributesProp, valueProp])
+    }, [valueProp])
 
     useEffect(() => {
-      console.log("06 SELECTION SETTER", selectionProp)
+      // console.log("06 SELECTION SETTER", selectionProp)
       setSelection({
         start: selectionProp?.start ?? 0,
         end: selectionProp?.end ?? selectionProp?.start ?? 0,
@@ -96,10 +80,27 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       runOnRuntime(getWorkletRuntime(), (attributes?: Attribute[]) => {
         "worklet"
 
-        console.log("10 ATTRIBUTE SETTER")
+        console.log("10 ATTRIBUTE SETTER", attributes)
+        skipUpdate.value = false
         appliedAttributes.value = attributes ?? []
       })(attributesProp)
     }, [attributesProp])
+
+    const resetWorker = useCallback((attributes?: Attribute[]) => {
+      "worklet"
+
+      skipUpdate.value = !!attributes
+      sharedText.value = ""
+      sharedSelection.value = { start: 0, end: 0 }
+      appliedAttributes.value = attributes ?? []
+      typingAttributes.value = []
+    }, [])
+
+    const reset = useCallback(() => {
+      setValue("")
+      setSelection({ start: 0, end: 0 })
+      runOnRuntime(getWorkletRuntime(), resetWorker)()
+    }, [resetWorker])
 
     const formatSelection = useCallback(
       (type: DISPLAY_TYPE, content: string | null = null) => {
@@ -114,7 +115,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               typingAttributes.value,
             )
             const { start, end } = sharedSelection.value
-            const text = sharedText.value
 
             if (start === end) {
               const types = new Set(typingAttributes.value)
@@ -153,15 +153,23 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           ...inputRef.current,
           complete,
           formatSelection,
+          reset,
         } as RichTextInputRef),
       [complete, formatSelection],
     )
+
+    useEffect(() => {
+      if (value !== valueProp) {
+        console.log("?? RESET")
+        runOnRuntime(getWorkletRuntime(), resetWorker)(attributesProp)
+      }
+    }, [attributesProp, resetWorker, value, valueProp])
 
     const onSelectionChangeWorker = useCallback(
       (selection: TextInputSelection) => {
         "worklet"
 
-        console.log("08 SELECTION WORKER", selection)
+        // console.log("08 SELECTION WORKER", selection)
 
         sharedSelection.value = selection
       },
@@ -170,7 +178,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        console.log("04 SELECTION EVENT")
+        // console.log("04 SELECTION EVENT")
         runOnRuntime(
           getWorkletRuntime(),
           onSelectionChangeWorker,
@@ -186,7 +194,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onChangeText = useCallback(
       (e: string) => {
-        console.log("03 CHANGE TEXT EVENT")
+        // console.log("03 CHANGE TEXT EVENT")
         if (typeof onChangeTextProp === "function") {
           onChangeTextProp(e)
         }
@@ -194,33 +202,17 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       [onChangeTextProp],
     )
 
-    const onChangeWorker = useCallback(
-      (text: string) => {
-        "worklet"
-
-        console.log("07 CHANGE WORKER", { text })
-
-        sharedText.value = text
-
-        if (typeof onChangeAttributes === "function") {
-          runOnJS(onChangeAttributes)(appliedAttributes.value)
-        }
-      },
-      [onChangeAttributes],
-    )
-
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-        console.log("02 CHANGE EVENT")
+        // console.log("02 CHANGE EVENT")
 
-        runOnRuntime(getWorkletRuntime(), onChangeWorker)(e.nativeEvent.text)
         setValue(e.nativeEvent.text)
 
         if (typeof onChangeProp === "function") {
           onChangeProp(e)
         }
       },
-      [onChangeProp, onChangeWorker],
+      [onChangeProp],
     )
 
     const parser = useCallback(
@@ -235,18 +227,16 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             sharedSelection.value.end = sharedText.value.length
           }
 
+          const { start, end } = sharedSelection.value
+          const types = new Set(typingAttributes.value)
+          const length = text.length - sharedText.value.length
           console.log(
             "01 PROCESSOR",
-            { text, prev: sharedText.value },
+            { text, prev: sharedText.value, length },
             sharedSelection.value,
             typingAttributes.value,
             appliedAttributes.value,
           )
-          const { start, end } = sharedSelection.value
-          const types = new Set(typingAttributes.value)
-          const length = text.length - sharedText.value.length
-          const position = { start: start + length, end: end + length }
-          console.log("01 PROPS", { length, ...position })
 
           for (const attr of appliedAttributes.value) {
             const attrEnd = attr.start + attr.length
@@ -268,27 +258,32 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             attributes.push(attr)
           }
 
-          for (const type of types) {
-            attributes.push({
-              type,
-              content: null,
-              start,
-              length,
-            })
+          if (length > 0) {
+            for (const type of types) {
+              attributes.push({
+                type,
+                content: null,
+                start,
+                length,
+              })
+            }
           }
 
           sharedText.value = text
           appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
+
+          if (typeof onChangeAttributes === "function") {
+            skipUpdate.value = true
+            runOnJS(onChangeAttributes)(appliedAttributes.value)
+          }
         } else {
-          console.log("01 PARSER", {
-            update: !skipUpdate.value,
-            text,
-            prev: sharedText.value,
-          })
+          // console.log("01 PARSER", {
+          //   update: !skipUpdate.value,
+          //   text,
+          //   prev: sharedText.value,
+          // })
           attributes.push(...appliedAttributes.value)
         }
-
-        skipUpdate.value = false
 
         console.log("01 ATTRIBUTES", attributes)
 
@@ -330,7 +325,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         return ranges
       },
-      [forceUpdate],
+      [forceUpdate, onChangeAttributes],
     )
 
     return (
