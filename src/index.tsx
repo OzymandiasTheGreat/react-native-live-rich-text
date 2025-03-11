@@ -125,6 +125,56 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               }
 
               typingAttributes.value = [...types]
+            } else {
+              const attributes: Attribute[] = []
+
+              let attribute: Attribute | null = null
+
+              for (const attr of appliedAttributes.value) {
+                const attrEnd = attr.start + attr.length
+
+                if (attr.start <= start && attrEnd >= end) {
+                  if (attr.type === type) {
+                    attribute = attr
+                  } else {
+                    attributes.push(attr)
+                  }
+                  continue
+                }
+
+                if (attr !== attribute) {
+                  attributes.push(attr)
+                }
+              }
+
+              if (attribute) {
+                if (start - attribute.start > 0) {
+                  attributes.push({
+                    type,
+                    content,
+                    start: attribute.start,
+                    length: start - attribute.start,
+                  })
+                }
+                if (attribute.start + attribute.length - end > 0) {
+                  attributes.push({
+                    type,
+                    content,
+                    start: end,
+                    length: attribute.start + attribute.length - end,
+                  })
+                }
+              } else {
+                attributes.push({ type, content, start, length: end - start })
+              }
+
+              appliedAttributes.value = attributes.sort(
+                (a, b) => a.start - b.start,
+              )
+
+              // TODO: calculate typing attributes
+
+              runOnJS(setForceUpdate)((u) => !u)
             }
 
             if (typeof onChangeTypingAttributes === "function") {
