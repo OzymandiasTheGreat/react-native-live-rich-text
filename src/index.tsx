@@ -88,14 +88,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const calculateTypingAttributesWorker = useCallback(() => {
       "worklet"
-      console.log("08 TYPING ATTRIBUTES", {
-        value,
-        text: sharedText.value,
-        ...sharedSelection.value,
-      })
+      console.log("08 TYPING ATTRIBUTES")
 
       const { start, end } = sharedSelection.value
-      const types = new Set(typingAttributes.value)
+      const types = new Set<DISPLAY_TYPE>()
 
       if (start === end) {
         for (const attr of appliedAttributes.value) {
@@ -104,14 +100,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           if (value === sharedText.value) {
             if (attr.start < start && attrEnd > end) {
               types.add(attr.type)
-            } else {
-              types.delete(attr.type)
             }
           } else {
             if (attr.start < start && attrEnd >= end) {
               types.add(attr.type)
-            } else {
-              types.delete(attr.type)
             }
           }
         }
@@ -121,13 +113,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
           if (attr.start <= start && attrEnd >= end) {
             types.add(attr.type)
-          } else {
-            types.delete(attr.type)
           }
         }
       }
-
-      // TODO: check for exclusive types
 
       typingAttributes.value = [...types]
 
@@ -168,12 +156,25 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             if (start === end) {
               const types = new Set(typingAttributes.value)
 
-              // TODO: codeblock support
+              if (EXCLUSIVE_TYPES.includes(type)) {
+                const exists = types.has(type)
 
-              if (types.has(type)) {
-                types.delete(type)
+                types.clear()
+
+                if (!exists) {
+                  types.add(type)
+                }
               } else {
-                types.add(type)
+                if (EXCLUSIVE_TYPES.some((type) => types.has(type))) {
+                  types.clear()
+                  types.add(type)
+                } else {
+                  if (types.has(type)) {
+                    types.delete(type)
+                  } else {
+                    types.add(type)
+                  }
+                }
               }
 
               typingAttributes.value = [...types]
@@ -188,6 +189,11 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
                 if (attr.start <= start && attrEnd >= end) {
                   if (attr.type === type) {
                     attribute = attr
+                  } else if (
+                    EXCLUSIVE_TYPES.includes(type) ||
+                    EXCLUSIVE_TYPES.includes(attr.type)
+                  ) {
+                    continue
                   } else {
                     attributes.push(attr)
                   }
