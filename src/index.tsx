@@ -79,23 +79,65 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     useEffect(() => {
       runOnRuntime(getWorkletRuntime(), (attributes?: Attribute[]) => {
         "worklet"
-        console.log("08 ATTRIBUTE SETTER")
+        console.log("09 ATTRIBUTE SETTER")
 
         skipUpdate.value = false
         appliedAttributes.value = attributes ?? []
       })(attributesProp)
     }, [attributesProp])
 
-    const resetWorker = useCallback((attributes?: Attribute[]) => {
+    const calculateTypingAttributesWorker = useCallback(() => {
       "worklet"
-      console.log("?X RESET")
+      console.log("08 TYPING ATTRIBUTES", {
+        value,
+        text: sharedText.value,
+        ...sharedSelection.value,
+      })
 
-      skipUpdate.value = !!attributes
-      sharedText.value = ""
-      sharedSelection.value = { start: 0, end: 0 }
-      appliedAttributes.value = attributes ?? []
-      typingAttributes.value = []
-    }, [])
+      const { start, end } = sharedSelection.value
+      const types = new Set(typingAttributes.value)
+
+      if (start === end) {
+        for (const attr of appliedAttributes.value) {
+          const attrEnd = attr.start + attr.length
+
+          if (value === sharedText.value) {
+            if (attr.start < start && attrEnd > end) {
+              types.add(attr.type)
+            } else {
+              types.delete(attr.type)
+            }
+          } else {
+            if (attr.start < start && attrEnd >= end) {
+              types.add(attr.type)
+            } else {
+              types.delete(attr.type)
+            }
+          }
+        }
+      }
+
+      // TODO: check for exclusive types
+
+      typingAttributes.value = [...types]
+
+      if (typeof onChangeTypingAttributes === "function") {
+        runOnJS(onChangeTypingAttributes)([...types])
+      }
+    }, [onChangeTypingAttributes, value])
+
+    const resetWorker = useCallback(
+      (value?: string, attributes?: Attribute[]) => {
+        "worklet"
+        console.log("?X RESET")
+
+        sharedText.value = value ?? ""
+        sharedSelection.value = { start: 0, end: 0 }
+        appliedAttributes.value = attributes ?? []
+        typingAttributes.value = []
+      },
+      [],
+    )
 
     const reset = useCallback(() => {
       setValue("")
@@ -172,7 +214,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
                 (a, b) => a.start - b.start,
               )
 
-              // TODO: calculate typing attributes
+              calculateTypingAttributesWorker()
 
               runOnJS(setForceUpdate)((u) => !u)
             }
@@ -183,7 +225,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           },
         )(type, content)
       },
-      [onChangeTypingAttributes],
+      [calculateTypingAttributesWorker, onChangeTypingAttributes],
     )
 
     const complete = useCallback(
@@ -207,7 +249,11 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     useEffect(() => {
       if (value !== valueProp) {
-        runOnRuntime(getWorkletRuntime(), resetWorker)(attributesProp)
+        // Props changed externally, reset state
+        runOnRuntime(getWorkletRuntime(), resetWorker)(
+          valueProp,
+          attributesProp,
+        )
       }
     }, [attributesProp, resetWorker, value, valueProp])
 
@@ -217,8 +263,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         console.log("07 SELECTION WORKER")
 
         sharedSelection.value = selection
+
+        calculateTypingAttributesWorker()
       },
-      [],
+      [calculateTypingAttributesWorker],
     )
 
     const onSelectionChange = useCallback(
