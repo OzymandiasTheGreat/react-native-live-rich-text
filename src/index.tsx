@@ -115,6 +115,16 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             }
           }
         }
+      } else {
+        for (const attr of appliedAttributes.value) {
+          const attrEnd = attr.start + attr.length
+
+          if (attr.start <= start && attrEnd >= end) {
+            types.add(attr.type)
+          } else {
+            types.delete(attr.type)
+          }
+        }
       }
 
       // TODO: check for exclusive types
