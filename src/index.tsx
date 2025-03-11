@@ -341,13 +341,26 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           const { start, end } = sharedSelection.value
           const types = new Set(typingAttributes.value)
           const length = text.length - sharedText.value.length
+          const next = text.slice(end, end + length)
 
           for (const attr of appliedAttributes.value) {
             const attrEnd = attr.start + attr.length
 
             if (types.has(attr.type) && attr.start <= start && attrEnd >= end) {
               types.delete(attr.type)
-              attr.length += length
+
+              if (attr.type === DISPLAY_TYPE.CODE) {
+                if (!next.startsWith("\n")) {
+                  if (next.includes("\n")) {
+                    console.log({ next: next.indexOf("\n") })
+                    attr.length += next.indexOf("\n")
+                  } else {
+                    attr.length += next.length
+                  }
+                }
+              } else {
+                attr.length += length
+              }
             } else if (attr.start >= start) {
               attr.start += length
             }
@@ -361,12 +374,21 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
           if (length > 0) {
             for (const type of types) {
-              attributes.push({
-                type,
-                content: null,
-                start,
-                length,
-              })
+              if (type === DISPLAY_TYPE.CODE) {
+                attributes.push({
+                  type,
+                  content: null,
+                  start,
+                  length: next.indexOf("\n"),
+                })
+              } else {
+                attributes.push({
+                  type,
+                  content: null,
+                  start,
+                  length,
+                })
+              }
             }
           }
 
