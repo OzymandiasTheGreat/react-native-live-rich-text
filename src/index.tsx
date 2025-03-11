@@ -64,12 +64,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const typingAttributes = useSharedValue<DISPLAY_TYPE[]>([])
 
     useEffect(() => {
-      // console.log("05 VALUE SETTER", valueProp)
+      console.log("05 VALUE SETTER")
       setValue(valueProp ?? "")
     }, [valueProp])
 
     useEffect(() => {
-      // console.log("06 SELECTION SETTER", selectionProp)
+      console.log("06 SELECTION SETTER")
       setSelection({
         start: selectionProp?.start ?? 0,
         end: selectionProp?.end ?? selectionProp?.start ?? 0,
@@ -79,8 +79,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     useEffect(() => {
       runOnRuntime(getWorkletRuntime(), (attributes?: Attribute[]) => {
         "worklet"
+        console.log("08 ATTRIBUTE SETTER")
 
-        console.log("10 ATTRIBUTE SETTER", attributes)
         skipUpdate.value = false
         appliedAttributes.value = attributes ?? []
       })(attributesProp)
@@ -88,6 +88,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const resetWorker = useCallback((attributes?: Attribute[]) => {
       "worklet"
+      console.log("?X RESET")
 
       skipUpdate.value = !!attributes
       sharedText.value = ""
@@ -108,12 +109,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           getWorkletRuntime(),
           (type: DISPLAY_TYPE, content: string | null) => {
             "worklet"
+            console.log("XX FORMAT SELECTION")
 
-            console.log(
-              "X FORMAT SELECTION",
-              { type, content },
-              typingAttributes.value,
-            )
             const { start, end } = sharedSelection.value
 
             if (start === end) {
@@ -141,7 +138,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const complete = useCallback(
       (type: DISPLAY_TYPE, text: string, content: string | null = null) => {
-        console.log("X COMPLETE", { type, text, content })
+        console.log("XX COMPLETE", { type, text, content })
       },
       [],
     )
@@ -160,7 +157,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     useEffect(() => {
       if (value !== valueProp) {
-        console.log("?? RESET")
         runOnRuntime(getWorkletRuntime(), resetWorker)(attributesProp)
       }
     }, [attributesProp, resetWorker, value, valueProp])
@@ -168,8 +164,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const onSelectionChangeWorker = useCallback(
       (selection: TextInputSelection) => {
         "worklet"
-
-        // console.log("08 SELECTION WORKER", selection)
+        console.log("07 SELECTION WORKER")
 
         sharedSelection.value = selection
       },
@@ -178,7 +173,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        // console.log("04 SELECTION EVENT")
+        console.log("04 SELECTION EVENT")
         runOnRuntime(
           getWorkletRuntime(),
           onSelectionChangeWorker,
@@ -194,7 +189,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onChangeText = useCallback(
       (e: string) => {
-        // console.log("03 CHANGE TEXT EVENT")
+        console.log("03 CHANGE TEXT EVENT")
         if (typeof onChangeTextProp === "function") {
           onChangeTextProp(e)
         }
@@ -204,7 +199,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-        // console.log("02 CHANGE EVENT")
+        console.log("02 CHANGE EVENT")
 
         setValue(e.nativeEvent.text)
 
@@ -222,6 +217,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         const attributes: Attribute[] = []
 
         if (!skipUpdate.value && sharedText.value !== text) {
+          console.log("01 PROCESSOR")
+
           if (sharedSelection.value.end > sharedText.value.length) {
             sharedSelection.value.start = sharedText.value.length
             sharedSelection.value.end = sharedText.value.length
@@ -230,28 +227,18 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           const { start, end } = sharedSelection.value
           const types = new Set(typingAttributes.value)
           const length = text.length - sharedText.value.length
-          console.log(
-            "01 PROCESSOR",
-            { text, prev: sharedText.value, length },
-            sharedSelection.value,
-            typingAttributes.value,
-            appliedAttributes.value,
-          )
 
           for (const attr of appliedAttributes.value) {
             const attrEnd = attr.start + attr.length
 
             if (types.has(attr.type) && attr.start <= start && attrEnd >= end) {
-              console.log("01 ATTR TYPE", attr, length)
               types.delete(attr.type)
               attr.length += length
             } else if (attr.start >= start) {
-              console.log("01 ATTR START", attr, length)
               attr.start += length
             }
 
             if (attrEnd > text.length) {
-              console.log("01 ATTR END")
               attr.length = text.length - attr.start
             }
 
@@ -274,18 +261,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
           if (typeof onChangeAttributes === "function") {
             skipUpdate.value = true
-            runOnJS(onChangeAttributes)(appliedAttributes.value)
+            runOnJS(onChangeAttributes)(attributes)
           }
         } else {
-          // console.log("01 PARSER", {
-          //   update: !skipUpdate.value,
-          //   text,
-          //   prev: sharedText.value,
-          // })
+          console.log("01 PARSER")
           attributes.push(...appliedAttributes.value)
         }
-
-        console.log("01 ATTRIBUTES", attributes)
 
         const ranges: MarkdownRange[] = []
 

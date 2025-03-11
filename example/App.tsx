@@ -55,26 +55,26 @@ export default function App() {
   const [format, setFormat] = useState<Set<DISPLAY_TYPE>>(new Set())
 
   const onChangeText = useCallback((text: string) => {
-    // console.log("A1 CHANGE TEXT", text)
+    console.log("A1 CHANGE TEXT")
     setText(text)
   }, [])
 
   const onSelectionChange = useCallback(
     (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      // console.log("A2 CHANGE SELECTION", e.nativeEvent.selection)
+      console.log("A2 CHANGE SELECTION")
       setSelection(e.nativeEvent.selection)
     },
     [],
   )
 
   const onChangeAttributes = useCallback((attrs: Attribute[]) => {
-    console.log("A3 CHANGE ATTRIBUTES", attrs)
+    console.log("A3 CHANGE ATTRIBUTES")
     setAttributes(attrs)
   }, [])
 
   const onChangeTypingAttributes = useCallback(
     (typingAttrs: DISPLAY_TYPE[]) => {
-      console.log("A4 TYPING ATTRIBUTES", typingAttrs)
+      console.log("AX TYPING ATTRIBUTES")
       setFormat(new Set(typingAttrs))
     },
     [],
