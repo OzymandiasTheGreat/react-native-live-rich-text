@@ -22,9 +22,9 @@
   "license": "Apache-2.0",
   "dependencies": {},
   "devDependencies": {
-    "@expensify/react-native-live-markdown": "^0.1.240",
+    "@expensify/react-native-live-markdown": "^0.1.250",
     "@types/react": "~18.3.12",
-    "expensify-common": "^2.0.118",
+    "expensify-common": "^2.0.125",
     "expo": "~52.0.0",
     "patch-package": "^8.0.0",
     "react-native": "0.76.0",

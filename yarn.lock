@@ -818,10 +818,10 @@
     "@babel/helper-string-parser" "^7.25.9"
     "@babel/helper-validator-identifier" "^7.25.9"
 
-"@expensify/react-native-live-markdown@^0.1.240":
-  version "0.1.240"
-  resolved "https://registry.yarnpkg.com/@expensify/react-native-live-markdown/-/react-native-live-markdown-0.1.240.tgz#2517a6a4ac39ad0080417241ca5703d07994d37c"
-  integrity sha512-cS/JSYuXO66azc5heyiua7e0Fy9bEB6bStRbuN7WsVeSyKz6ltj9xQnGCgibsDQtH8DNXVvAILdCUMFiXWSPTg==
+"@expensify/react-native-live-markdown@^0.1.250":
+  version "0.1.250"
+  resolved "https://registry.yarnpkg.com/@expensify/react-native-live-markdown/-/react-native-live-markdown-0.1.250.tgz#e893f06141d5942ee3e41fe0612af243076acc88"
+  integrity sha512-zK30cxq2rS4K1e9qPWX6x1Qu8zaO0hVMjSfk/P81vd1KIP7D2AnVprZ63Rb0BQm6EYXemt0CvBgIQTBzQGFJOQ==
 
 "@expo/bunyan@^4.0.0":
   version "4.0.1"
@@ -2795,10 +2795,10 @@ execa@^5.1.1:
     signal-exit "^3.0.3"
     strip-final-newline "^2.0.0"
 
-expensify-common@^2.0.118:
-  version "2.0.118"
-  resolved "https://registry.yarnpkg.com/expensify-common/-/expensify-common-2.0.118.tgz#da2acf0e916031b1743f0d4c3fdac140453cd93e"
-  integrity sha512-UVyTEDKslBBAigbaINyBjdLDLq+vRPjuWZwpbgGKxMr+YqGgR8Pbvg53DbxBJfwBnk/YOs6wq9wqXIItmRGblQ==
+expensify-common@^2.0.125:
+  version "2.0.125"
+  resolved "https://registry.yarnpkg.com/expensify-common/-/expensify-common-2.0.125.tgz#63acae510038b844daddeeb3d9e01817bf08876f"
+  integrity sha512-dTMrvyFKyUcswfPL8Un/cYQKwfiY6vTjv4zgOJoMs3YXj2ovGMcAOhz1OXI9j/zJkoB1AvC6y2py56V0lBHFQA==
   dependencies:
     awesome-phonenumber "^5.4.0"
     classnames "2.5.0"
