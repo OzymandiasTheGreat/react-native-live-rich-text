@@ -124,17 +124,84 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       }
     }, [onChangeTypingAttributes, value])
 
+    const formatCodeBlockWorker = useCallback(() => {
+      "worklet"
+      console.log("?? FORMAT CODEBLOCK")
+
+      const { start, end } = sharedSelection.value
+      const text = sharedText.value
+      const prev = text.charAt(start - 1)
+      const next = text.charAt(end + 1)
+
+      let selection = { start, end }
+      let value = text
+
+      if (!typingAttributes.value.includes(DISPLAY_TYPE.CODE_BLOCK)) {
+        if (start === end) {
+          if (start > 0 && prev !== "\n") {
+            value = text.slice(0, start) + "\n" + text.slice(start)
+            selection = { start: start + 1, end: end + 1 }
+          }
+        }
+      } else {
+        if (start === end) {
+          if (prev !== "\n" && next !== "\n") {
+            appliedAttributes.value = appliedAttributes.value.map((attr) => {
+              const attrEnd = attr.start + attr.length
+
+              if (
+                attr.type === DISPLAY_TYPE.CODE_BLOCK &&
+                attr.start <= start &&
+                attrEnd >= end
+              ) {
+                attr.length += 1
+              }
+
+              return attr
+            })
+            value = text.slice(0, start) + "\n" + text.slice(start)
+            selection = { start: start + 1, end: end + 1 }
+          }
+        }
+      }
+
+      sharedText.value = value
+      sharedSelection.value = selection
+
+      if (typeof onChangeProp === "function") {
+        runOnJS(onChangeProp)({
+          nativeEvent: { text: value, eventCount: -1, target: -1 },
+        } as NativeSyntheticEvent<TextInputChangeEventData>)
+      }
+
+      if (typeof onChangeTextProp === "function") {
+        runOnJS(onChangeTextProp)(value)
+      }
+
+      runOnJS(setValue)(value)
+
+      if (typeof onSelectionChangeProp === "function") {
+        runOnJS(onSelectionChangeProp)({
+          nativeEvent: { selection, target: -1 },
+        } as NativeSyntheticEvent<TextInputSelectionChangeEventData>)
+      }
+
+      runOnJS(setSelection)(selection)
+    }, [])
+
     const resetWorker = useCallback(
       (value?: string, attributes?: Attribute[]) => {
         "worklet"
         console.log("?X RESET")
 
         sharedText.value = value ?? ""
-        sharedSelection.value = { start: 0, end: 0 }
+        sharedSelection.value = selection
         appliedAttributes.value = attributes ?? []
         typingAttributes.value = []
+
+        calculateTypingAttributesWorker()
       },
-      [],
+      [selection],
     )
 
     const reset = useCallback(() => {
@@ -157,6 +224,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               const types = new Set(typingAttributes.value)
 
               if (EXCLUSIVE_TYPES.includes(type)) {
+                if (type === DISPLAY_TYPE.CODE_BLOCK) {
+                  formatCodeBlockWorker()
+                }
+
                 const exists = types.has(type)
 
                 types.clear()
@@ -241,7 +312,11 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           },
         )(type, content)
       },
-      [calculateTypingAttributesWorker, onChangeTypingAttributes],
+      [
+        calculateTypingAttributesWorker,
+        formatCodeBlockWorker,
+        onChangeTypingAttributes,
+      ],
     )
 
     const complete = useCallback(
@@ -352,7 +427,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               if (attr.type === DISPLAY_TYPE.CODE) {
                 if (!next.startsWith("\n")) {
                   if (next.includes("\n")) {
-                    console.log({ next: next.indexOf("\n") })
                     attr.length += next.indexOf("\n")
                   } else {
                     attr.length += next.length
