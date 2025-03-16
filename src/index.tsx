@@ -440,6 +440,18 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               continue
             }
 
+            const prevAttr = attributes.find((prev) => {
+              const prevEnd = prev.start + prev.length
+
+              return attr.type === prev.type && attr.start <= prevEnd
+            })
+
+            if (prevAttr) {
+              prevAttr.length +=
+                prevAttr.start + prevAttr.length - attr.start + attr.length
+              continue
+            }
+
             attributes.push(attr)
           }
 
@@ -465,6 +477,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
           sharedText.value = text
           appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
+          console.log(attributes)
 
           if (typeof onChangeAttributes === "function") {
             skipUpdate.value = true
