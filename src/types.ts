@@ -17,6 +17,7 @@ export enum DISPLAY_TYPE {
   STRIKE_THROUGH,
 }
 
+export const BLOCK_TYPES = [DISPLAY_TYPE.CODE_BLOCK]
 export const EXCLUSIVE_TYPES = [DISPLAY_TYPE.CODE, DISPLAY_TYPE.CODE_BLOCK]
 
 export type Attribute = {

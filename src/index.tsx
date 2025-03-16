@@ -20,6 +20,7 @@ import {
 } from "@expensify/react-native-live-markdown"
 import {
   type Attribute,
+  BLOCK_TYPES,
   DISPLAY_TYPE,
   EXCLUSIVE_TYPES,
   type RichTextInputProps,
@@ -100,6 +101,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           if (value === sharedText.value) {
             if (attr.start < start && attrEnd > end) {
               types.add(attr.type)
+            } else if (BLOCK_TYPES.includes(attr.type) && start === 0) {
+              types.add(attr.type)
             }
           } else {
             if (attr.start < start && attrEnd >= end) {
@@ -124,71 +127,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       }
     }, [onChangeTypingAttributes, value])
 
-    const formatCodeBlockWorker = useCallback(() => {
-      "worklet"
-      console.log("?? FORMAT CODEBLOCK")
-
-      const { start, end } = sharedSelection.value
-      const text = sharedText.value
-      const prev = text.charAt(start - 1)
-      const next = text.charAt(end + 1)
-
-      let selection = { start, end }
-      let value = text
-
-      if (!typingAttributes.value.includes(DISPLAY_TYPE.CODE_BLOCK)) {
-        if (start === end) {
-          if (start > 0 && prev !== "\n") {
-            value = text.slice(0, start) + "\n" + text.slice(start)
-            selection = { start: start + 1, end: end + 1 }
-          }
-        }
-      } else {
-        if (start === end) {
-          if (prev !== "\n" && next !== "\n") {
-            appliedAttributes.value = appliedAttributes.value.map((attr) => {
-              const attrEnd = attr.start + attr.length
-
-              if (
-                attr.type === DISPLAY_TYPE.CODE_BLOCK &&
-                attr.start <= start &&
-                attrEnd >= end
-              ) {
-                attr.length += 1
-              }
-
-              return attr
-            })
-            value = text.slice(0, start) + "\n" + text.slice(start)
-            selection = { start: start + 1, end: end + 1 }
-          }
-        }
-      }
-
-      sharedText.value = value
-      sharedSelection.value = selection
-
-      if (typeof onChangeProp === "function") {
-        runOnJS(onChangeProp)({
-          nativeEvent: { text: value, eventCount: -1, target: -1 },
-        } as NativeSyntheticEvent<TextInputChangeEventData>)
-      }
-
-      if (typeof onChangeTextProp === "function") {
-        runOnJS(onChangeTextProp)(value)
-      }
-
-      runOnJS(setValue)(value)
-
-      if (typeof onSelectionChangeProp === "function") {
-        runOnJS(onSelectionChangeProp)({
-          nativeEvent: { selection, target: -1 },
-        } as NativeSyntheticEvent<TextInputSelectionChangeEventData>)
-      }
-
-      runOnJS(setSelection)(selection)
-    }, [])
-
     const resetWorker = useCallback(
       (value?: string, attributes?: Attribute[]) => {
         "worklet"
@@ -210,6 +148,53 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       runOnRuntime(getWorkletRuntime(), resetWorker)()
     }, [resetWorker])
 
+    const formatCodeBlockWorker = useCallback((type: DISPLAY_TYPE) => {
+      "worklet"
+
+      const text = sharedText.value
+      const { start, end } = sharedSelection.value
+      const types = new Set(typingAttributes.value)
+      const prevNewLine = text.lastIndexOf("\n", Math.max(0, start - 1))
+      const nextNewLine = text.indexOf("\n", end)
+      const lineStart = Math.max(0, prevNewLine)
+      const lineEnd = nextNewLine > 0 ? nextNewLine + 1 : text.length
+      const attributesToSplit: Attribute[] = []
+      const attributes = appliedAttributes.value.filter((attr) => {
+        const attrEnd = attr.start + attr.length
+
+        if (attr.start < lineStart && attrEnd <= lineEnd) {
+          attr.length = lineStart - attr.start
+        } else if (attr.start >= lineStart && attrEnd > lineEnd) {
+          attr.start = lineEnd
+        } else if (attr.start < lineStart && attrEnd > lineEnd) {
+          attributesToSplit.push(attr)
+          return false
+        }
+
+        return !(attr.start >= lineStart && attrEnd <= lineEnd)
+      })
+
+      for (const attr of attributesToSplit) {
+        attributes.push({ ...attr, length: lineStart - attr.start })
+        attributes.push({
+          ...attr,
+          start: lineEnd,
+          length: attr.start + attr.length - lineEnd,
+        })
+      }
+
+      if (!types.has(type)) {
+        attributes.push({
+          type,
+          content: null,
+          start: lineStart,
+          length: lineEnd - lineStart,
+        })
+      }
+
+      appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
+    }, [])
+
     const formatSelection = useCallback(
       (type: DISPLAY_TYPE, content: string | null = null) => {
         runOnRuntime(
@@ -219,13 +204,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             console.log("XX FORMAT SELECTION")
 
             const { start, end } = sharedSelection.value
+            const text = sharedText.value
 
             if (start === end) {
               const types = new Set(typingAttributes.value)
 
               if (EXCLUSIVE_TYPES.includes(type)) {
-                if (type === DISPLAY_TYPE.CODE_BLOCK) {
-                  formatCodeBlockWorker()
+                if (BLOCK_TYPES.includes(type)) {
+                  formatCodeBlockWorker(type)
                 }
 
                 const exists = types.has(type)
@@ -249,60 +235,67 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               }
 
               typingAttributes.value = [...types]
+
+              if (BLOCK_TYPES.includes(type)) {
+                runOnJS(setForceUpdate)((u) => !u)
+              }
             } else {
-              const attributes: Attribute[] = []
+              if (BLOCK_TYPES.includes(type)) {
+                formatCodeBlockWorker(type)
+              } else {
+                const attributes: Attribute[] = []
 
-              let attribute: Attribute | null = null
+                let attribute: Attribute | null = null
 
-              for (const attr of appliedAttributes.value) {
-                const attrEnd = attr.start + attr.length
+                for (const attr of appliedAttributes.value) {
+                  const attrEnd = attr.start + attr.length
 
-                if (attr.start <= start && attrEnd >= end) {
-                  if (attr.type === type) {
-                    attribute = attr
-                  } else if (
-                    EXCLUSIVE_TYPES.includes(type) ||
-                    EXCLUSIVE_TYPES.includes(attr.type)
-                  ) {
+                  if (attr.start <= start && attrEnd >= end) {
+                    if (attr.type === type) {
+                      attribute = attr
+                    } else if (
+                      EXCLUSIVE_TYPES.includes(type) ||
+                      EXCLUSIVE_TYPES.includes(attr.type)
+                    ) {
+                      continue
+                    } else {
+                      attributes.push(attr)
+                    }
                     continue
-                  } else {
+                  }
+
+                  if (attr !== attribute) {
                     attributes.push(attr)
                   }
-                  continue
                 }
 
-                if (attr !== attribute) {
-                  attributes.push(attr)
+                if (attribute) {
+                  if (start - attribute.start > 0) {
+                    attributes.push({
+                      type,
+                      content,
+                      start: attribute.start,
+                      length: start - attribute.start,
+                    })
+                  }
+                  if (attribute.start + attribute.length - end > 0) {
+                    attributes.push({
+                      type,
+                      content,
+                      start: end,
+                      length: attribute.start + attribute.length - end,
+                    })
+                  }
+                } else {
+                  attributes.push({ type, content, start, length: end - start })
                 }
+
+                appliedAttributes.value = attributes.sort(
+                  (a, b) => a.start - b.start,
+                )
               }
-
-              if (attribute) {
-                if (start - attribute.start > 0) {
-                  attributes.push({
-                    type,
-                    content,
-                    start: attribute.start,
-                    length: start - attribute.start,
-                  })
-                }
-                if (attribute.start + attribute.length - end > 0) {
-                  attributes.push({
-                    type,
-                    content,
-                    start: end,
-                    length: attribute.start + attribute.length - end,
-                  })
-                }
-              } else {
-                attributes.push({ type, content, start, length: end - start })
-              }
-
-              appliedAttributes.value = attributes.sort(
-                (a, b) => a.start - b.start,
-              )
 
               calculateTypingAttributesWorker()
-
               runOnJS(setForceUpdate)((u) => !u)
             }
 
@@ -441,6 +434,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
             if (attrEnd > text.length) {
               attr.length = text.length - attr.start
+            }
+
+            if (attr.start < 0 || attr.length <= 0) {
+              continue
             }
 
             attributes.push(attr)
