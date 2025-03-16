@@ -1,6 +1,8 @@
 import React, { type ElementRef, useCallback, useRef, useState } from "react"
 import {
+  FlatList,
   KeyboardAvoidingView,
+  ListRenderItemInfo,
   NativeSyntheticEvent,
   Pressable,
   SafeAreaView,
@@ -53,22 +55,39 @@ export default function App() {
     end: 0,
   })
   const [format, setFormat] = useState<Set<DISPLAY_TYPE>>(new Set())
+  const [autocompleteContent, setAutocompleteContent] = useState<
+    typeof MemberList | string[]
+  >([])
 
   const onChangeText = useCallback((text: string) => {
     console.log("A1 CHANGE TEXT")
     setText(text)
   }, [])
 
+  const onChangePrefix = useCallback((type: DISPLAY_TYPE, prefix: string) => {
+    console.log("A2 CHANGE PREFIX", { prefix, type })
+
+    if (type === DISPLAY_TYPE.MENTION) {
+      setAutocompleteContent(
+        MemberList.filter((member) =>
+          member.name.toLowerCase().startsWith(prefix),
+        ),
+      )
+    } else {
+      setAutocompleteContent([])
+    }
+  }, [])
+
   const onSelectionChange = useCallback(
     (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      console.log("A2 CHANGE SELECTION")
+      console.log("A3 CHANGE SELECTION")
       setSelection(e.nativeEvent.selection)
     },
     [],
   )
 
   const onChangeAttributes = useCallback((attrs: Attribute[]) => {
-    console.log("A3 CHANGE ATTRIBUTES")
+    console.log("A4 CHANGE ATTRIBUTES")
     setAttributes(attrs)
   }, [])
 
@@ -127,81 +146,118 @@ export default function App() {
     setFormat(new Set())
   }, [])
 
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<(typeof MemberList)[0] | string>) => {
+      if (typeof item === "string") {
+        return (
+          <Text
+            onPress={() =>
+              ref.current?.complete(DISPLAY_TYPE.EMOJI, item, item)
+            }
+          >
+            {item}
+          </Text>
+        )
+      } else {
+        return (
+          <Text
+            onPress={() =>
+              ref.current?.complete(DISPLAY_TYPE.MENTION, item.name, item.id)
+            }
+          >
+            {item.name}
+          </Text>
+        )
+      }
+    },
+    [],
+  )
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView>
-        <View style={styles.inputContainer}>
-          <RichTextInput
-            editable
-            multiline
-            ref={ref}
-            style={styles.input}
-            value={text}
-            onChangeText={onChangeText}
-            selection={selection}
-            onSelectionChange={onSelectionChange}
-            attributes={attributes}
-            onChangeAttributes={onChangeAttributes}
-            onChangeTypingAttributes={onChangeTypingAttributes}
-          />
-          <View style={styles.toolbar}>
-            <Pressable
-              style={[
-                styles.button,
-                format.has(DISPLAY_TYPE.BOLD) && styles.highlight,
-              ]}
-              onPress={toggleBold}
-            >
-              <Text style={[styles.label, styles.bold]}>B</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.button,
-                format.has(DISPLAY_TYPE.ITALIC) && styles.highlight,
-              ]}
-              onPress={toggleItalic}
-            >
-              <Text style={[styles.label, styles.italic]}>I</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.button,
-                format.has(DISPLAY_TYPE.STRIKE_THROUGH) && styles.highlight,
-              ]}
-              onPress={toggleStrikethrough}
-            >
-              <Text style={[styles.label, styles.strike]}>S</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.button,
-                format.has(DISPLAY_TYPE.CODE) && styles.highlight,
-              ]}
-              onPress={toggleCode}
-            >
-              <Text style={styles.label}>{"<>"}</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.button,
-                format.has(DISPLAY_TYPE.CODE_BLOCK) && styles.highlight,
-              ]}
-              onPress={toggleCodeBlock}
-            >
-              <Text style={styles.label}>{"</>"}</Text>
-            </Pressable>
-            <Pressable style={styles.button} onPress={applyTemplate1}>
-              <Text style={styles.label}>1</Text>
-            </Pressable>
-            <Pressable style={styles.button} onPress={applyTemplate2}>
-              <Text style={styles.label}>2</Text>
-            </Pressable>
-            <Pressable style={styles.button} onPress={applyTemplate3}>
-              <Text style={styles.label}>3</Text>
-            </Pressable>
-            <Pressable style={styles.button} onPress={clear}>
-              <Text style={styles.label}>X</Text>
-            </Pressable>
+        <View>
+          {!!autocompleteContent.length && (
+            <FlatList
+              data={autocompleteContent}
+              renderItem={renderItem}
+              style={styles.autocomplete}
+            />
+          )}
+          <View style={styles.inputContainer}>
+            <RichTextInput
+              editable
+              multiline
+              ref={ref}
+              style={styles.input}
+              value={text}
+              onChangeText={onChangeText}
+              selection={selection}
+              onSelectionChange={onSelectionChange}
+              attributes={attributes}
+              onChangeAttributes={onChangeAttributes}
+              onChangeTypingAttributes={onChangeTypingAttributes}
+              onChangePrefix={onChangePrefix}
+            />
+            <View style={styles.toolbar}>
+              <Pressable
+                style={[
+                  styles.button,
+                  format.has(DISPLAY_TYPE.BOLD) && styles.highlight,
+                ]}
+                onPress={toggleBold}
+              >
+                <Text style={[styles.label, styles.bold]}>B</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.button,
+                  format.has(DISPLAY_TYPE.ITALIC) && styles.highlight,
+                ]}
+                onPress={toggleItalic}
+              >
+                <Text style={[styles.label, styles.italic]}>I</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.button,
+                  format.has(DISPLAY_TYPE.STRIKE_THROUGH) && styles.highlight,
+                ]}
+                onPress={toggleStrikethrough}
+              >
+                <Text style={[styles.label, styles.strike]}>S</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.button,
+                  format.has(DISPLAY_TYPE.CODE) && styles.highlight,
+                ]}
+                onPress={toggleCode}
+              >
+                <Text style={styles.label}>{"<>"}</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.button,
+                  format.has(DISPLAY_TYPE.CODE_BLOCK) && styles.highlight,
+                ]}
+                onPress={toggleCodeBlock}
+              >
+                <Text style={styles.label}>{"</>"}</Text>
+              </Pressable>
+              <Pressable style={styles.button} onPress={applyTemplate1}>
+                <Text style={styles.label}>1</Text>
+              </Pressable>
+              <Pressable style={styles.button} onPress={applyTemplate2}>
+                <Text style={styles.label}>2</Text>
+              </Pressable>
+              <Pressable style={styles.button} onPress={applyTemplate3}>
+                <Text style={styles.label}>3</Text>
+              </Pressable>
+              <Pressable style={styles.button} onPress={clear}>
+                <Text style={styles.label}>X</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -210,6 +266,12 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  autocomplete: {
+    maxHeight: 96,
+    borderColor: "#000",
+    borderWidth: 1,
+    borderRadius: 8,
+  },
   bold: {
     fontWeight: "bold",
   },
@@ -243,7 +305,6 @@ const styles = StyleSheet.create({
     height: 96,
     paddingHorizontal: 4,
     paddingVertical: 8,
-    width: "80%",
   },
   italic: {
     fontStyle: "italic",

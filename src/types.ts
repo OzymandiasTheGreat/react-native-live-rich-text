@@ -20,6 +20,16 @@ export enum DISPLAY_TYPE {
 export const BLOCK_TYPES = [DISPLAY_TYPE.CODE_BLOCK]
 export const EXCLUSIVE_TYPES = [DISPLAY_TYPE.CODE, DISPLAY_TYPE.CODE_BLOCK]
 
+export interface PrefixTrigger {
+  emoji: string
+  mention: string
+}
+
+export const DEFAULT_PREFIX: PrefixTrigger = {
+  emoji: ":",
+  mention: "@",
+}
+
 export type Attribute = {
   start: number
   length: number
@@ -37,9 +47,10 @@ export interface RichTextInputProps
   attributes?: Attribute[]
   attributeStyle?: Omit<MarkdownStyle, "syntax">
   prefixMaxLength?: number
+  prefixTrigger?: PrefixTrigger
   onChangeAttributes?: (attributes: Attribute[]) => void
   onChangeTypingAttributes?: (typingAttributes: DISPLAY_TYPE[]) => void
-  onChangePrefix?: (prefix: string) => void
+  onChangePrefix?: (type: DISPLAY_TYPE | null, prefix: string | null) => void
 }
 
 export type RichTextInputRef = MarkdownTextInput & {

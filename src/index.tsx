@@ -21,8 +21,10 @@ import {
 import {
   type Attribute,
   BLOCK_TYPES,
+  DEFAULT_PREFIX,
   DISPLAY_TYPE,
   EXCLUSIVE_TYPES,
+  type PrefixTrigger,
   type RichTextInputProps,
   type RichTextInputRef,
   type TextInputSelection,
@@ -35,7 +37,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       selection: selectionProp,
       attributes: attributesProp,
       attributeStyle,
-      prefixMaxLength,
+      prefixMaxLength = 255,
+      prefixTrigger = DEFAULT_PREFIX,
       onChange: onChangeProp,
       onChangeText: onChangeTextProp,
       onSelectionChange: onSelectionChangeProp,
@@ -47,6 +50,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     ref,
   ) => {
     const inputRef = useRef<MarkdownTextInput>(null)
+    const textRef = useRef("")
     const [forceUpdate, setForceUpdate] = useState(false)
 
     const [value, setValue] = useState("")
@@ -365,8 +369,58 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         if (typeof onSelectionChangeProp === "function") {
           onSelectionChangeProp(e)
         }
+
+        const text = textRef.current
+
+        if (typeof onChangePrefix === "function") {
+          if (Object.values(prefixTrigger).some((t) => text.includes(t))) {
+            const { start } = e.nativeEvent.selection
+            const emojiPosition = text.lastIndexOf(prefixTrigger.emoji, start)
+            const mentionPosition = text.lastIndexOf(
+              prefixTrigger.mention,
+              start,
+            )
+            const spacePosition = text.indexOf(" ", start)
+            const emojiOpen = emojiPosition > spacePosition
+            console.log({ emojiPosition, mentionPosition, spacePosition, text })
+
+            if (
+              emojiPosition >= 0 &&
+              emojiOpen &&
+              emojiPosition > mentionPosition
+            ) {
+              const prefix = text
+                .slice(emojiPosition + prefixTrigger.emoji.length)
+                .slice(0, prefixMaxLength)
+
+              if (prefix) {
+                onChangePrefix(DISPLAY_TYPE.EMOJI, prefix)
+              } else {
+                onChangePrefix(DISPLAY_TYPE.EMOJI, "")
+              }
+            } else if (mentionPosition >= 0) {
+              const prefix = text
+                .slice(mentionPosition + prefixTrigger.mention.length)
+                .slice(0, prefixMaxLength)
+
+              if (prefix) {
+                onChangePrefix(DISPLAY_TYPE.MENTION, prefix)
+              } else {
+                onChangePrefix(DISPLAY_TYPE.MENTION, "")
+              }
+            }
+          } else {
+            onChangePrefix(null, null)
+          }
+        }
       },
-      [onSelectionChangeProp, onSelectionChangeWorker],
+      [
+        onChangePrefix,
+        onSelectionChangeProp,
+        onSelectionChangeWorker,
+        prefixMaxLength,
+        prefixTrigger,
+      ],
     )
 
     const onChangeText = useCallback(
@@ -383,6 +437,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
         console.log("02 CHANGE EVENT")
 
+        textRef.current = e.nativeEvent.text
         setValue(e.nativeEvent.text)
 
         if (typeof onChangeProp === "function") {
@@ -556,6 +611,7 @@ export { DISPLAY_TYPE }
 
 export type {
   Attribute,
+  PrefixTrigger,
   RichTextInputProps,
   RichTextInputRef,
   TextInputSelection,
