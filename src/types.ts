@@ -18,7 +18,11 @@ export enum DISPLAY_TYPE {
 }
 
 export const BLOCK_TYPES = [DISPLAY_TYPE.CODE_BLOCK]
-export const EXCLUSIVE_TYPES = [DISPLAY_TYPE.CODE, DISPLAY_TYPE.CODE_BLOCK]
+export const EXCLUSIVE_TYPES = [
+  DISPLAY_TYPE.CODE,
+  DISPLAY_TYPE.CODE_BLOCK,
+  DISPLAY_TYPE.MENTION,
+]
 
 export interface PrefixTrigger {
   emoji: string

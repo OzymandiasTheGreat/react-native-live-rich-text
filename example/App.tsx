@@ -60,23 +60,30 @@ export default function App() {
   >([])
 
   const onChangeText = useCallback((text: string) => {
-    console.log("A1 CHANGE TEXT")
+    console.log("A2 CHANGE TEXT")
     setText(text)
   }, [])
 
-  const onChangePrefix = useCallback((type: DISPLAY_TYPE, prefix: string) => {
-    console.log("A2 CHANGE PREFIX", { prefix, type })
+  const onChangePrefix = useCallback(
+    (type: DISPLAY_TYPE | null, prefix: string | null) => {
+      console.log("A4 CHANGE PREFIX", { prefix, type })
 
-    if (type === DISPLAY_TYPE.MENTION) {
-      setAutocompleteContent(
-        MemberList.filter((member) =>
-          member.name.toLowerCase().startsWith(prefix),
-        ),
-      )
-    } else {
-      setAutocompleteContent([])
-    }
-  }, [])
+      if (typeof prefix === "string") {
+        if (type === DISPLAY_TYPE.MENTION) {
+          setAutocompleteContent(
+            MemberList.filter((member) =>
+              member.name.toLowerCase().startsWith(prefix),
+            ),
+          )
+        } else {
+          setAutocompleteContent([])
+        }
+      } else {
+        setAutocompleteContent([])
+      }
+    },
+    [],
+  )
 
   const onSelectionChange = useCallback(
     (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
@@ -87,7 +94,7 @@ export default function App() {
   )
 
   const onChangeAttributes = useCallback((attrs: Attribute[]) => {
-    console.log("A4 CHANGE ATTRIBUTES")
+    console.log("A1 CHANGE ATTRIBUTES")
     setAttributes(attrs)
   }, [])
 
