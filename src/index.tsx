@@ -53,6 +53,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const inputRef = useRef<MarkdownTextInput>(null)
     const textRef = useRef("")
     const attributeRef = useRef<Attribute[]>([])
+    const currentAttributeRef = useRef<Attribute | null>(null)
     const [forceUpdate, setForceUpdate] = useState(false)
 
     const [value, setValue] = useState("")
@@ -93,6 +94,25 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       })(attributesProp)
     }, [attributesProp])
 
+    const updateValue = useCallback((value: string) => {
+      textRef.current = value
+      setValue(value)
+    }, [])
+
+    const onChangeAttributes = useCallback(
+      (attributes: Attribute[], current: Attribute | null = null) => {
+        console.log("02 CHANGE ATTRIBUTES", attributes)
+
+        attributeRef.current = attributes
+        currentAttributeRef.current = current ?? null
+
+        if (typeof onChangeAttributesProp === "function") {
+          onChangeAttributesProp(attributes)
+        }
+      },
+      [onChangeAttributesProp],
+    )
+
     const calculateTypingAttributesWorker = useCallback(() => {
       "worklet"
       console.log("09 TYPING ATTRIBUTES")
@@ -126,7 +146,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
       }
 
-      typingAttributes.value = [...types]
+      typingAttributes.value = [...types].filter(
+        (type) => !NEVER_TYPES.includes(type),
+      )
 
       if (typeof onChangeTypingAttributes === "function") {
         runOnJS(onChangeTypingAttributes)([...types])
@@ -149,10 +171,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     )
 
     const reset = useCallback(() => {
-      setValue("")
+      updateValue("")
       setSelection({ start: 0, end: 0 })
       runOnRuntime(getWorkletRuntime(), resetWorker)()
-    }, [resetWorker])
+    }, [resetWorker, updateValue])
 
     const formatCodeBlockWorker = useCallback((type: DISPLAY_TYPE) => {
       "worklet"
@@ -423,7 +445,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
             calculateTypingAttributesWorker()
 
-            runOnJS(setValue)(nextValue)
+            runOnJS(updateValue)(nextValue)
             runOnJS(setSelection)(nextSelection)
             runOnJS(onChangeAttributes)(attributes)
 
@@ -449,7 +471,17 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           },
         )(type, text, content)
       },
-      [calculateTypingAttributesWorker, prefixTrigger, prefixMaxLength],
+      [
+        calculateTypingAttributesWorker,
+        onChangeAttributes,
+        onChangePrefix,
+        onChangeProp,
+        onChangeTextProp,
+        onSelectionChangeProp,
+        prefixTrigger,
+        prefixMaxLength,
+        updateValue,
+      ],
     )
 
     useImperativeHandle(
@@ -490,6 +522,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
         console.log("05 SELECTION EVENT")
 
+        const text = textRef.current
         const selection = { ...e.nativeEvent.selection }
         const attribute = attributeRef.current.find((attr) => {
           const { start, end } = selection
@@ -497,9 +530,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
           return (
             NEVER_TYPES.includes(attr.type) &&
-            ((attr.start <= start && attrEnd >= end) ||
-              (attr.start >= start && attr.start <= end) ||
-              (attrEnd >= start && attrEnd <= end))
+            ((attr.start < start && attrEnd > end) ||
+              (attr.start > start && attr.start < end) ||
+              (attrEnd > start && attrEnd < end))
           )
         })
 
@@ -516,7 +549,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             selection.start = Math.min(attribute.start, selection.start)
             selection.end = Math.max(attrEnd, selection.end)
           }
-          setForceUpdate((u) => !u)
         }
 
         runOnRuntime(getWorkletRuntime(), onSelectionChangeWorker)(selection)
@@ -528,8 +560,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             nativeEvent: { ...e.nativeEvent, selection },
           })
         }
-
-        const text = textRef.current
 
         if (typeof onChangePrefix === "function") {
           if (Object.values(prefixTrigger).some((t) => text.includes(t))) {
@@ -617,42 +647,37 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       ],
     )
 
-    const onChangeText = useCallback(
-      (e: string) => {
-        console.log("04 CHANGE TEXT EVENT")
-
-        if (typeof onChangeTextProp === "function") {
-          onChangeTextProp(e)
-        }
-      },
-      [onChangeTextProp],
-    )
-
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
         console.log("03 CHANGE EVENT")
 
-        textRef.current = e.nativeEvent.text
-        setValue(e.nativeEvent.text)
+        const prev = textRef.current
+        const attribute = currentAttributeRef.current
+        let text = e.nativeEvent.text
+        const length = text.length - prev.length
+
+        if (length === attribute?.length) {
+          currentAttributeRef.current = null
+          return
+        }
+
+        if (length < 0 && attribute) {
+          const attrEnd = attribute.start + attribute.length
+          text = prev.slice(0, attribute.start) + prev.slice(attrEnd + 1)
+        } else {
+          currentAttributeRef.current = null
+        }
+        updateValue(text)
 
         if (typeof onChangeProp === "function") {
-          onChangeProp(e)
+          onChangeProp({ ...e, nativeEvent: { ...e.nativeEvent, text } })
+        }
+
+        if (typeof onChangeTextProp === "function") {
+          onChangeTextProp(text)
         }
       },
-      [onChangeProp],
-    )
-
-    const onChangeAttributes = useCallback(
-      (attributes: Attribute[]) => {
-        console.log("02 CHANGE ATTRIBUTES", attributes)
-
-        attributeRef.current = attributes
-
-        if (typeof onChangeAttributesProp === "function") {
-          onChangeAttributesProp(attributes)
-        }
-      },
-      [onChangeAttributesProp],
+      [onChangeProp, onChangeTextProp, updateValue],
     )
 
     const parser = useCallback(
@@ -673,6 +698,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           const types = new Set(typingAttributes.value)
           const length = text.length - sharedText.value.length
           const next = text.slice(end, end + length)
+          let currentAttr: Attribute | null = null
 
           for (const attr of appliedAttributes.value) {
             const attrEnd = attr.start + attr.length
@@ -696,12 +722,25 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               attrEnd === start &&
               length < 0
             ) {
+              if (NEVER_TYPES.includes(attr.type)) {
+                currentAttr = { ...attr }
+              }
+
               attr.length += length
             } else if (attr.start >= start) {
+              if (NEVER_TYPES.includes(attr.type)) {
+                currentAttr = { ...attr }
+                continue
+              }
+
               attr.start += length
             }
 
             if (attrEnd > text.length) {
+              if (NEVER_TYPES.includes(attr.type)) {
+                currentAttr = { ...attr }
+              }
+
               attr.length = text.length - attr.start
             }
 
@@ -748,7 +787,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
           skipUpdate.value = true
 
-          runOnJS(onChangeAttributes)(attributes)
+          runOnJS(onChangeAttributes)(attributes, currentAttr)
         } else {
           console.log("01 PARSER")
 
@@ -807,7 +846,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         parser={parser}
         value={value}
         onChange={onChange}
-        onChangeText={onChangeText}
         selection={selection}
         onSelectionChange={onSelectionChange}
       />
