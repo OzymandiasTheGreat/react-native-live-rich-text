@@ -190,9 +190,17 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       const attributes = appliedAttributes.value.filter((attr) => {
         const attrEnd = attr.start + attr.length
 
-        if (attr.start < lineStart && attrEnd <= lineEnd) {
+        if (
+          attr.start < lineStart &&
+          attrEnd > lineStart &&
+          attrEnd <= lineEnd
+        ) {
           attr.length = lineStart - attr.start
-        } else if (attr.start >= lineStart && attrEnd > lineEnd) {
+        } else if (
+          attr.start >= lineStart &&
+          attr.start < lineEnd &&
+          attrEnd > lineEnd
+        ) {
           attr.start = lineEnd
         } else if (attr.start < lineStart && attrEnd > lineEnd) {
           attributesToSplit.push(attr)
@@ -386,9 +394,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             for (const attr of appliedAttributes.value) {
               const attrEnd = attr.start + attr.length - (start - position)
 
-              // TODO: add new length to attrEnd and push all trailing attrs
               if (EXCLUSIVE_TYPES.includes(type)) {
-                if (BLOCK_TYPES.some((type) => attr.type === type)) {
+                if (
+                  BLOCK_TYPES.some((type) => attr.type === type) &&
+                  attr.start <= position &&
+                  attrEnd > position
+                ) {
                   continue
                 }
 
