@@ -24,6 +24,7 @@ import {
   DEFAULT_PREFIX,
   DISPLAY_TYPE,
   EXCLUSIVE_TYPES,
+  NEVER_TYPES,
   type PrefixTrigger,
   type RichTextInputProps,
   type RichTextInputRef,
@@ -489,21 +490,50 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
         console.log("05 SELECTION EVENT")
 
-        runOnRuntime(
-          getWorkletRuntime(),
-          onSelectionChangeWorker,
-        )(e.nativeEvent.selection)
-        setSelection(e.nativeEvent.selection)
+        const selection = { ...e.nativeEvent.selection }
+        const attribute = attributeRef.current.find((attr) => {
+          const { start, end } = selection
+          const attrEnd = attr.start + attr.length
+
+          return (
+            NEVER_TYPES.includes(attr.type) &&
+            ((attr.start <= start && attrEnd >= end) ||
+              (attr.start >= start && attr.start <= end) ||
+              (attrEnd >= start && attrEnd <= end))
+          )
+        })
+
+        if (attribute) {
+          const attrEnd = attribute.start + attribute.length
+          if (selection.start === selection.end) {
+            const position =
+              selection.start - attribute.start > attrEnd - selection.end
+                ? attribute.start
+                : attrEnd
+            selection.start = position
+            selection.end = position
+          } else {
+            selection.start = Math.min(attribute.start, selection.start)
+            selection.end = Math.max(attrEnd, selection.end)
+          }
+          setForceUpdate((u) => !u)
+        }
+
+        runOnRuntime(getWorkletRuntime(), onSelectionChangeWorker)(selection)
+        setSelection(selection)
 
         if (typeof onSelectionChangeProp === "function") {
-          onSelectionChangeProp(e)
+          onSelectionChangeProp({
+            ...e,
+            nativeEvent: { ...e.nativeEvent, selection },
+          })
         }
 
         const text = textRef.current
 
         if (typeof onChangePrefix === "function") {
           if (Object.values(prefixTrigger).some((t) => text.includes(t))) {
-            const { start } = e.nativeEvent.selection
+            const { start } = selection
             const emojiPosition = text.lastIndexOf(prefixTrigger.emoji, start)
             const mentionPosition = text.lastIndexOf(
               prefixTrigger.mention,
