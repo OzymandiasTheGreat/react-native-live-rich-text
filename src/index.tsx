@@ -803,7 +803,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
                   type,
                   content: null,
                   start,
-                  length: next.indexOf("\n"),
+                  length: Math.min(length, Math.max(1, next.indexOf("\n"))),
                 })
               } else {
                 attributes.push({
