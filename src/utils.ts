@@ -1,53 +1,38 @@
-import { Attribute, DISPLAY_TYPE, TextInputSelection } from "./types"
+import type { MarkdownStyle } from "@expensify/react-native-live-markdown"
+import { type AttributeStyle } from "./types"
 
-export function hydrateMentions(
-  text: string,
-  attributes: Attribute[],
-): [string, Attribute[]] {
-  const attrs = [...attributes.map((attr) => ({ ...attr }))]
-  let output = ""
-  let position = 0
-  let index = 0
+export function remapAttributeStyles(
+  attributeStyle: AttributeStyle,
+): MarkdownStyle {
+  const style: MarkdownStyle = {}
 
-  for (const mention of attrs) {
-    if (mention.type !== DISPLAY_TYPE.MENTION) {
-      continue
+  for (const key of Object.keys(attributeStyle) as (keyof AttributeStyle)[]) {
+    switch (key) {
+      case "mentionOne":
+        style["mentionUser"] = attributeStyle[key]
+        break
+      case "mentionTwo":
+        style["mentionHere"] = attributeStyle[key]
+        break
+      case "mentionThree":
+        style["mentionReport"] = attributeStyle[key]
+        break
+      case "link":
+        style["link"] = attributeStyle[key]
+        break
+      case "code":
+        style["code"] = attributeStyle[key]
+        break
+      case "codeBlock":
+        style["pre"] = attributeStyle[key]
+        break
+      case "emoji":
+        style["emoji"] = attributeStyle[key]
+        break
+      default:
+        console.error(`Unknown key in AttributeStyle: ${key}`)
     }
-
-    const end = mention.start + mention.length + index
-    output += text.slice(position, mention.start)
-    output += `@${text.slice(mention.start, end)}`
-    mention.start += index
-    mention.length++
-    position = end
-    index++
   }
-  output += text.slice(position)
-  return [output, attrs]
-}
 
-export function dehydrateMentions(
-  text: string,
-  attributes: Attribute[],
-): [string, Attribute[]] {
-  const attrs = [...attributes.map((attr) => ({ ...attr }))]
-  let output = ""
-  let position = 0
-  let index = 0
-
-  for (const mention of attrs) {
-    if (mention.type !== DISPLAY_TYPE.MENTION) {
-      continue
-    }
-
-    const end = mention.start + mention.length - index
-    output += text.slice(position, mention.start)
-    output += text.slice(mention.start - index + 1, end)
-    mention.start -= index
-    mention.length--
-    position = end
-    index++
-  }
-  output += text.slice(position)
-  return [output, attrs]
+  return style
 }

@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react"
@@ -30,6 +31,7 @@ import {
   type RichTextInputRef,
   type TextInputSelection,
 } from "./types"
+import { remapAttributeStyles } from "./utils"
 
 const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
   (
@@ -55,6 +57,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const attributeRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
     const [forceUpdate, setForceUpdate] = useState(false)
+    const markdownStyle = useMemo(
+      () => remapAttributeStyles(attributeStyle ?? {}),
+      [attributeStyle],
+    )
 
     const [value, setValue] = useState("")
     const [selection, setSelection] = useState<TextInputSelection>({
@@ -869,7 +875,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       <MarkdownTextInput
         {...props}
         ref={inputRef}
-        markdownStyle={attributeStyle}
+        markdownStyle={markdownStyle}
         parser={parser}
         value={value}
         onChange={onChange}

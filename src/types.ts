@@ -30,6 +30,12 @@ export const NEVER_TYPES = [
   DISPLAY_TYPE.EMOJI,
 ]
 
+export enum MentionType {
+  ONE,
+  TWO,
+  THREE,
+}
+
 export interface PrefixTrigger {
   emoji: string
   mention: string
@@ -49,13 +55,24 @@ export type Attribute = {
 
 export type TextInputSelection = TextInputSelectionChangeEventData["selection"]
 
+export interface AttributeStyle {
+  mentionOne?: MarkdownStyle["mentionUser"]
+  mentionTwo?: MarkdownStyle["mentionHere"]
+  mentionThree?: MarkdownStyle["mentionReport"]
+  link?: MarkdownStyle["link"]
+  code?: MarkdownStyle["code"]
+  codeBlock?: MarkdownStyle["pre"]
+  emoji?: MarkdownStyle["emoji"]
+}
+
 export interface RichTextInputProps
   extends Omit<
     MarkdownTextInputProps,
     "markdownStyle" | "parser" | "formatSelection"
   > {
   attributes?: Attribute[]
-  attributeStyle?: Omit<MarkdownStyle, "syntax">
+  attributeStyle?: AttributeStyle
+  mentionTypeWorklet?: (text: string, content: string | null) => MentionType
   prefixMaxLength?: number
   prefixTrigger?: PrefixTrigger
   onChangeAttributes?: (attributes: Attribute[]) => void

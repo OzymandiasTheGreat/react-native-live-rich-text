@@ -66,7 +66,7 @@ export default function App() {
 
   const onChangePrefix = useCallback(
     (type: DISPLAY_TYPE | null, prefix: string | null) => {
-      console.log("A4 CHANGE PREFIX", { prefix, type })
+      console.log("A4 CHANGE PREFIX")
 
       if (typeof prefix === "string") {
         if (type === DISPLAY_TYPE.MENTION) {
