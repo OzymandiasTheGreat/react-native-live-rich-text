@@ -124,7 +124,23 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         for (const attr of appliedAttributes.value) {
           const attrEnd = attr.start + attr.length
 
-          if (value === sharedText.value) {
+          if (BLOCK_TYPES.includes(attr.type)) {
+            if (value === sharedText.value) {
+              if (
+                sharedText.value.charAt(end - 1) === "\n" &&
+                attr.start <= start &&
+                attrEnd === end
+              ) {
+                continue
+              } else if (attr.start <= start && attrEnd >= end) {
+                types.add(attr.type)
+              }
+            } else {
+              if (attr.start <= start && attrEnd >= end) {
+                types.add(attr.type)
+              }
+            }
+          } else if (value === sharedText.value) {
             if (attr.start < start && attrEnd > end) {
               types.add(attr.type)
             } else if (BLOCK_TYPES.includes(attr.type) && start === 0) {
