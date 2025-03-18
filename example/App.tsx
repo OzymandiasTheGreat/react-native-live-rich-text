@@ -60,7 +60,7 @@ export default function App() {
   >([])
 
   const onChangeText = useCallback((text: string) => {
-    console.log("A2 CHANGE TEXT")
+    console.log("A2 CHANGE TEXT", text)
     setText(text)
   }, [])
 
@@ -87,14 +87,14 @@ export default function App() {
 
   const onSelectionChange = useCallback(
     (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      console.log("A3 CHANGE SELECTION")
+      console.log("A3 CHANGE SELECTION", e.nativeEvent.selection)
       setSelection(e.nativeEvent.selection)
     },
     [],
   )
 
   const onChangeAttributes = useCallback((attrs: Attribute[]) => {
-    console.log("A1 CHANGE ATTRIBUTES")
+    console.log("A1 CHANGE ATTRIBUTES", attrs)
     setAttributes(attrs)
   }, [])
 
