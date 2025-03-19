@@ -68,7 +68,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       end: 0,
     })
 
-    const skipUpdate = useSharedValue(false)
     const sharedText = useSharedValue("")
     const sharedSelection = useSharedValue<TextInputSelection>({
       start: 0,
@@ -364,9 +363,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     useEffect(() => {
       runOnRuntime(getWorkletRuntime(), (attributes: Attribute[]) => {
         "worklet"
-        console.log("09 ATTRIBUTE SETTER")
+        console.log("09 ATTRIBUTE SETTER", attributes)
 
-        skipUpdate.value = false
         appliedAttributes.value = attributes
       })(hydrateAttributes(attributesProp))
     }, [attributesProp, hydrateAttributes])
@@ -399,7 +397,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               }
             }
           } else if (value === sharedText.value) {
-            if (attr.start < start && attrEnd > end) {
+            if (
+              typingAttributes.value.includes(attr.type) &&
+              attr.start < start &&
+              attrEnd >= end
+            ) {
+              types.add(attr.type)
+            } else if (attr.start < start && attrEnd > end) {
               types.add(attr.type)
             } else if (BLOCK_TYPES.includes(attr.type) && start === 0) {
               types.add(attr.type)
@@ -779,9 +783,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         "worklet"
         console.log("07 SELECTION WORKER")
 
-        sharedSelection.value = selection
+        if (
+          sharedSelection.value.start !== selection.start ||
+          sharedSelection.value.end !== selection.end
+        ) {
+          sharedSelection.value = selection
 
-        calculateTypingAttributesWorker()
+          calculateTypingAttributesWorker()
+        }
       },
       [calculateTypingAttributesWorker],
     )
@@ -859,8 +868,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         const attributes: Attribute[] = []
 
-        if (!skipUpdate.value && sharedText.value !== text) {
-          console.log("01 PROCESSOR", { text, prev: sharedText.value })
+        if (sharedText.value !== text) {
+          console.log("01 PROCESSOR")
 
           if (sharedSelection.value.end > sharedText.value.length) {
             sharedSelection.value.start = sharedText.value.length
@@ -876,13 +885,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           for (const attr of appliedAttributes.value) {
             const attrEnd = attr.start + attr.length
 
-            console.log({
-              type: types.has(attr.type),
-              attr,
-              start,
-              end,
-              attrEnd,
-            })
             if (types.has(attr.type) && attr.start <= start && attrEnd >= end) {
               types.delete(attr.type)
 
@@ -916,7 +918,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               attr.start += length
             }
 
-            if (attrEnd > text.length) {
+            if (attrEnd > text.length && text.length - attrEnd >= length) {
               if (NEVER_TYPES.includes(attr.type)) {
                 currentAttr = { ...attr }
               }
@@ -965,7 +967,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
           sharedText.value = text
           appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
-          skipUpdate.value = true
 
           runOnJS(emitAttributes)(attributes, currentAttr)
         } else {
