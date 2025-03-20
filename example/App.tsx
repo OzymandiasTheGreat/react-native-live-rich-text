@@ -1,14 +1,14 @@
-import React, { type ElementRef, useCallback, useRef, useState } from "react"
+import React, { useCallback, useRef, useState } from "react"
 import {
   FlatList,
   KeyboardAvoidingView,
-  ListRenderItemInfo,
-  NativeSyntheticEvent,
+  type ListRenderItemInfo,
+  type NativeSyntheticEvent,
   Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
-  TextInputSelectionChangeEventData,
+  type TextInputSelectionChangeEventData,
   View,
 } from "react-native"
 import RichTextInput, {
@@ -48,7 +48,7 @@ const Template3 = {
 }
 
 export default function App() {
-  const ref = useRef<ElementRef<typeof RichTextInput>>(null)
+  const ref = useRef<RichTextInput>(null)
   const [text, setText] = useState("")
   const [attributes, setAttributes] = useState<Attribute[]>([])
   const [selection, setSelection] = useState<TextInputSelection>({

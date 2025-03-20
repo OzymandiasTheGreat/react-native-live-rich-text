@@ -1,4 +1,5 @@
 import React, {
+  type ElementRef,
   forwardRef,
   useCallback,
   useEffect,
@@ -16,11 +17,13 @@ import { runOnJS, runOnRuntime, useSharedValue } from "react-native-reanimated"
 import {
   getWorkletRuntime,
   type MarkdownRange,
+  type MarkdownStyle,
   MarkdownTextInput,
   type MarkdownType,
 } from "@expensify/react-native-live-markdown"
 import {
   type Attribute,
+  type AttributeStyle,
   BLOCK_TYPES,
   DEFAULT_PREFIX,
   DISPLAY_TYPE,
@@ -32,7 +35,8 @@ import {
   type RichTextInputRef,
   type TextInputSelection,
 } from "./types"
-import { remapAttributeStyles } from "./utils"
+
+type RichTextInput = ElementRef<typeof RichTextInput>
 
 const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
   (
@@ -1065,10 +1069,45 @@ export { DISPLAY_TYPE, MENTION_TYPE }
 
 export type {
   Attribute,
+  AttributeStyle,
   PrefixTrigger,
   RichTextInputProps,
   RichTextInputRef,
   TextInputSelection,
+}
+
+function remapAttributeStyles(attributeStyle: AttributeStyle): MarkdownStyle {
+  const style: MarkdownStyle = {}
+
+  for (const key of Object.keys(attributeStyle) as (keyof AttributeStyle)[]) {
+    switch (key) {
+      case "mentionOne":
+        style["mentionUser"] = attributeStyle[key]
+        break
+      case "mentionTwo":
+        style["mentionHere"] = attributeStyle[key]
+        break
+      case "mentionThree":
+        style["mentionReport"] = attributeStyle[key]
+        break
+      case "link":
+        style["link"] = attributeStyle[key]
+        break
+      case "code":
+        style["code"] = attributeStyle[key]
+        break
+      case "codeBlock":
+        style["pre"] = attributeStyle[key]
+        break
+      case "emoji":
+        style["emoji"] = attributeStyle[key]
+        break
+      default:
+        console.error(`Unknown key in AttributeStyle: ${key}`)
+    }
+  }
+
+  return style
 }
 
 function defaultMentionTypeWorklet(
