@@ -25,6 +25,7 @@ import {
   DEFAULT_PREFIX,
   DISPLAY_TYPE,
   EXCLUSIVE_TYPES,
+  MENTION_TYPE,
   NEVER_TYPES,
   type PrefixTrigger,
   type RichTextInputProps,
@@ -42,6 +43,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       attributeStyle = {},
       prefixMaxLength = 140,
       prefixTrigger = DEFAULT_PREFIX,
+      mentionTypeWorklet = defaultMentionTypeWorklet,
       onChange: onChangeProp,
       onChangeText: onChangeTextProp,
       onSelectionChange: onSelectionChangeProp,
@@ -85,11 +87,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (value: string) => {
         const current = currentAttributeRef.current
         let output = ""
+        let start = 0
         let end = 0
         let prefix = prefixTrigger.mention
 
         for (const attr of attributeRef.current) {
-          const attrEnd = attr.start + attr.length
+          const attrEnd = attr.start + attr.length - start
 
           if (
             current &&
@@ -100,8 +103,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           ) {
             continue
           } else if (attr.type === DISPLAY_TYPE.MENTION) {
-            const mention = prefix + value.slice(attr.start, attrEnd)
-            output += value.slice(end, attr.start) + mention
+            const mention = prefix + value.slice(attr.start - start, attrEnd)
+            output += value.slice(end, attr.start - start) + mention
+            start += prefix.length
           } else {
             output += value.slice(end, attrEnd)
           }
@@ -1004,7 +1008,28 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               type = "pre"
               break
             case DISPLAY_TYPE.MENTION:
-              type = "mention-user"
+              const mentionType = mentionTypeWorklet(
+                text.slice(
+                  attr.start + prefixTrigger.mention.length,
+                  attr.start + attr.length,
+                ),
+                attr.content,
+              )
+
+              switch (mentionType) {
+                case MENTION_TYPE.ONE:
+                  type = "mention-user"
+                  break
+                case MENTION_TYPE.TWO:
+                  type = "mention-here"
+                  break
+                case MENTION_TYPE.THREE:
+                  type = "mention-report"
+                  break
+                default:
+                  console.error("Unknown Mention type")
+                  type = "mention-user"
+              }
               break
             default:
               console.error("Unknown Display type")
@@ -1016,7 +1041,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         return ranges
       },
-      [emitAttributes, forceUpdate],
+      [emitAttributes, forceUpdate, mentionTypeWorklet, prefixTrigger.mention],
     )
 
     return (
@@ -1036,7 +1061,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
 export default RichTextInput
 
-export { DISPLAY_TYPE }
+export { DISPLAY_TYPE, MENTION_TYPE }
 
 export type {
   Attribute,
@@ -1044,4 +1069,13 @@ export type {
   RichTextInputProps,
   RichTextInputRef,
   TextInputSelection,
+}
+
+function defaultMentionTypeWorklet(
+  text: string,
+  content: string | null,
+): MENTION_TYPE {
+  "worklet"
+
+  return MENTION_TYPE.ONE
 }

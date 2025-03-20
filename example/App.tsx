@@ -14,6 +14,7 @@ import {
 import RichTextInput, {
   type Attribute,
   DISPLAY_TYPE,
+  MENTION_TYPE,
   type TextInputSelection,
 } from "react-native-live-rich-text"
 
@@ -58,6 +59,22 @@ export default function App() {
   const [autocompleteContent, setAutocompleteContent] = useState<
     typeof MemberList | string[]
   >([])
+
+  const mentionTypeWorklet = useCallback(
+    (text: string, content: string | null) => {
+      "worklet"
+
+      const index = MemberList.findIndex((member) => member.id === content)
+
+      if (index < 3) {
+        return MENTION_TYPE.THREE
+      } else if (index < 6) {
+        return MENTION_TYPE.TWO
+      }
+      return MENTION_TYPE.ONE
+    },
+    [],
+  )
 
   const onChangeText = useCallback((text: string) => {
     console.log("A2 CHANGE TEXT", text)
@@ -197,6 +214,7 @@ export default function App() {
               multiline
               ref={ref}
               style={styles.input}
+              mentionTypeWorklet={mentionTypeWorklet}
               value={text}
               onChangeText={onChangeText}
               selection={selection}

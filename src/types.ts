@@ -30,7 +30,7 @@ export const NEVER_TYPES = [
   DISPLAY_TYPE.EMOJI,
 ]
 
-export enum MentionType {
+export enum MENTION_TYPE {
   ONE,
   TWO,
   THREE,
@@ -72,9 +72,9 @@ export interface RichTextInputProps
   > {
   attributes?: Attribute[]
   attributeStyle?: AttributeStyle
-  mentionTypeWorklet?: (text: string, content: string | null) => MentionType
   prefixMaxLength?: number
   prefixTrigger?: PrefixTrigger
+  mentionTypeWorklet?: (text: string, content: string | null) => MENTION_TYPE
   onChangeAttributes?: (attributes: Attribute[]) => void
   onChangeTypingAttributes?: (typingAttributes: DISPLAY_TYPE[]) => void
   onChangePrefix?: (type: DISPLAY_TYPE | null, prefix: string | null) => void
