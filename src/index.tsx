@@ -88,7 +88,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     }, [])
 
     const hydrateValue = useCallback(
-      (value: string) => {
+      (value: string): string => {
         const current = currentAttributeRef.current
         let output = ""
         let start = 0
@@ -128,7 +128,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     )
 
     const dehydrateValue = useCallback(
-      (value: string) => {
+      (value: string): string => {
         let output = ""
         let end = 0
         let length = prefixTrigger.mention.length
@@ -159,10 +159,47 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       [prefixTrigger.mention],
     )
 
-    // TODO: de/hydrate selection
+    const hydrateSelection = useCallback(
+      (selection: TextInputSelection): TextInputSelection => {
+        const length = prefixTrigger.mention.length
+        let start = selection.start
+        let end = selection.end
+
+        for (const attr of attributeRef.current) {
+          if (attr.type === DISPLAY_TYPE.MENTION && attr.start < start) {
+            start += length
+            end += length
+          }
+        }
+
+        return { start, end }
+      },
+      [prefixTrigger.mention],
+    )
+
+    const dehydrateSelection = useCallback(
+      (selection: TextInputSelection): TextInputSelection => {
+        const length = prefixTrigger.mention.length
+        let start = selection.start
+        let end = selection.end
+
+        for (const attr of attributeRef.current) {
+          if (
+            attr.type === DISPLAY_TYPE.MENTION &&
+            attr.start < selection.start
+          ) {
+            start -= length
+            end -= length
+          }
+        }
+
+        return { start, end }
+      },
+      [prefixTrigger.mention],
+    )
 
     const hydrateAttributes = useCallback(
-      (attributes: Attribute[]) => {
+      (attributes: Attribute[]): Attribute[] => {
         const current = currentAttributeRef.current
         const output: Attribute[] = []
         let start = 0
@@ -194,7 +231,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     )
 
     const dehydrateAttributes = useCallback(
-      (attributes: Attribute[]) => {
+      (attributes: Attribute[]): Attribute[] => {
         const output: Attribute[] = []
         let start = 0
         let length = prefixTrigger.mention.length
@@ -249,9 +286,15 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         const event: NativeSyntheticEvent<TextInputSelectionChangeEventData> =
           "start" in e
             ? ({
-                nativeEvent: { selection: e, target: -1 },
+                nativeEvent: { selection: dehydrateSelection(e), target: -1 },
               } as NativeSyntheticEvent<TextInputSelectionChangeEventData>)
-            : e
+            : {
+                ...e,
+                nativeEvent: {
+                  ...e.nativeEvent,
+                  selection: dehydrateSelection(e.nativeEvent.selection),
+                },
+              }
 
         if (typeof onSelectionChangeProp === "function") {
           onSelectionChangeProp(event)
@@ -336,7 +379,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           }
         }
       },
-      [onChangePrefix, onSelectionChangeProp, prefixMaxLength, prefixTrigger],
+      [
+        dehydrateSelection,
+        onChangePrefix,
+        onSelectionChangeProp,
+        prefixMaxLength,
+        prefixTrigger,
+      ],
     )
 
     const emitAttributes = useCallback(
@@ -362,11 +411,16 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     useEffect(() => {
       console.log("06 SELECTION SETTER")
 
-      setSelection((selection) => ({
-        start: selectionProp?.start ?? selection.start,
-        end: selectionProp?.end ?? selectionProp?.start ?? selection.end,
-      }))
-    }, [selectionProp])
+      setSelection((selection) => {
+        if (selectionProp) {
+          return hydrateSelection({
+            ...selectionProp,
+            end: selectionProp.end ?? selectionProp.start,
+          })
+        }
+        return selection
+      })
+    }, [hydrateSelection, selectionProp])
 
     useEffect(() => {
       runOnRuntime(getWorkletRuntime(), (attributes: Attribute[]) => {
@@ -820,7 +874,11 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           )
         })
 
-        if (attribute) {
+        if (currentAttributeRef.current) {
+          const { start } = currentAttributeRef.current
+          selection.start = start
+          selection.end = start
+        } else if (attribute) {
           const attrEnd = attribute.start + attribute.length
 
           if (selection.start === selection.end) {
