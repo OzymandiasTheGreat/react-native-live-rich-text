@@ -818,10 +818,10 @@
     "@babel/helper-string-parser" "^7.25.9"
     "@babel/helper-validator-identifier" "^7.25.9"
 
-"@expensify/react-native-live-markdown@^0.1.250":
-  version "0.1.250"
-  resolved "https://registry.yarnpkg.com/@expensify/react-native-live-markdown/-/react-native-live-markdown-0.1.250.tgz#e893f06141d5942ee3e41fe0612af243076acc88"
-  integrity sha512-zK30cxq2rS4K1e9qPWX6x1Qu8zaO0hVMjSfk/P81vd1KIP7D2AnVprZ63Rb0BQm6EYXemt0CvBgIQTBzQGFJOQ==
+"@expensify/react-native-live-markdown@^0.1.254":
+  version "0.1.254"
+  resolved "https://registry.yarnpkg.com/@expensify/react-native-live-markdown/-/react-native-live-markdown-0.1.254.tgz#070c80353cdef37e04894e56aa4a0f80a91aa56e"
+  integrity sha512-n5mhGN1uyCvmBVnEX7K/15pLB2Ow/gtWvc3n+XoFTFuWJ6fVVSSeNCt2ZD1P2Ke5t1rUPkasGYOqatpaNMuu9A==
 
 "@expo/bunyan@^4.0.0":
   version "4.0.1"
@@ -4749,7 +4749,7 @@ react-native-is-edge-to-edge@1.1.6:
   resolved "https://registry.yarnpkg.com/react-native-is-edge-to-edge/-/react-native-is-edge-to-edge-1.1.6.tgz#69ec13f70d76e9245e275eed4140d0873a78f902"
   integrity sha512-1pHnFTlBahins6UAajXUqeCOHew9l9C2C8tErnpGC3IyLJzvxD+TpYAixnCbrVS52f7+NvMttbiSI290XfwN0w==
 
-react-native-reanimated@~3.17.1:
+react-native-reanimated@^3.17.1:
   version "3.17.1"
   resolved "https://registry.yarnpkg.com/react-native-reanimated/-/react-native-reanimated-3.17.1.tgz#42bed044ad046f09efcc00a80fabcc6eb18c7073"
   integrity sha512-ECzLhLxMKLifv34a8799/MHqIazQZV9fLMNSMdixXQlzX71RyL3/ah3cz/h3ERoyhJAYRC2ySLLZho6pXSqMFQ==
