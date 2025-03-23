@@ -61,6 +61,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const inputRef = useRef<MarkdownTextInput>(null)
     const textRef = useRef("")
     const attributeRef = useRef<Attribute[]>([])
+    const emittedRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
     const [forceUpdate, setForceUpdate] = useState(false)
     const markdownStyle = useMemo(
@@ -390,26 +391,28 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const emitAttributes = useCallback(
       (attributes: Attribute[], current: Attribute | null = null) => {
-        console.log("02 EMIT ATTRIBUTES", attributes)
+        console.log("07 EMIT ATTRIBUTES", JSON.stringify(attributes, null, 2))
 
         attributeRef.current = attributes
         currentAttributeRef.current = current
 
         if (typeof onChangeAttributes === "function") {
-          onChangeAttributes(dehydrateAttributes(attributes))
+          const dehydrated = dehydrateAttributes(attributes)
+          emittedRef.current = dehydrated
+          onChangeAttributes(dehydrated)
         }
       },
       [dehydrateAttributes, onChangeAttributes],
     )
 
     useEffect(() => {
-      console.log("05 VALUE SETTER")
+      console.log("04 VALUE SETTER", JSON.stringify(valueProp, null, 2))
 
       setValue(hydrateValue(valueProp))
     }, [hydrateValue, valueProp, setValue])
 
     useEffect(() => {
-      console.log("06 SELECTION SETTER")
+      console.log("05 SELECTION SETTER", JSON.stringify(selectionProp, null, 2))
 
       setSelection((selection) => {
         if (selectionProp) {
@@ -423,17 +426,25 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     }, [hydrateSelection, selectionProp])
 
     useEffect(() => {
-      runOnRuntime(getWorkletRuntime(), (attributes: Attribute[]) => {
-        "worklet"
-        console.log("09 ATTRIBUTE SETTER", attributes)
+      if (emittedRef.current !== attributesProp) {
+        runOnRuntime(getWorkletRuntime(), (attributes: Attribute[]) => {
+          "worklet"
+          console.log(
+            "10 ATTRIBUTE SETTER",
+            JSON.stringify(attributes, null, 2),
+          )
 
-        appliedAttributes.value = attributes
-      })(hydrateAttributes(attributesProp))
+          appliedAttributes.value = attributes
+        })(attributesProp)
+      }
     }, [attributesProp, hydrateAttributes])
 
     const calculateTypingAttributesWorker = useCallback(() => {
       "worklet"
-      console.log("08 TYPING ATTRIBUTES")
+      console.log(
+        "09 TYPING ATTRIBUTES",
+        JSON.stringify(typingAttributes.value, null, 2),
+      )
 
       const { start, end } = sharedSelection.value
       const types = new Set<DISPLAY_TYPE>()
@@ -498,7 +509,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const resetWorker = useCallback(
       (value?: string, attributes?: Attribute[]) => {
         "worklet"
-        console.log("?X RESET")
+        console.log(
+          "?X RESET",
+          JSON.stringify({ value, selection, attributes }, null, 2),
+        )
 
         sharedText.value = value ?? ""
         sharedSelection.value = selection
@@ -580,7 +594,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             console.log("XX FORMAT SELECTION")
 
             const { start, end } = sharedSelection.value
-            const text = sharedText.value
 
             if (start === end) {
               const types = new Set(typingAttributes.value)
@@ -843,7 +856,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const onSelectionChangeWorker = useCallback(
       (selection: TextInputSelection) => {
         "worklet"
-        console.log("07 SELECTION WORKER")
+        console.log("08 SELECTION WORKER", JSON.stringify(selection, null, 2))
 
         if (
           sharedSelection.value.start !== selection.start ||
@@ -859,7 +872,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        console.log("04 SELECTION EVENT")
+        console.log(
+          "03 SELECTION EVENT",
+          JSON.stringify(e.nativeEvent, null, 2),
+        )
 
         const selection = { ...e.nativeEvent.selection }
         const attribute = attributeRef.current.find((attr) => {
@@ -901,9 +917,111 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       [emitSelection, onSelectionChangeWorker],
     )
 
+    const onChangeWorker = useCallback(
+      (text: string) => {
+        "worklet"
+        console.log("06 CHANGE WORKER")
+
+        if (sharedSelection.value.end > sharedText.value.length) {
+          sharedSelection.value.start = sharedText.value.length
+          sharedSelection.value.end = sharedText.value.length
+        }
+
+        const prevAttributes = appliedAttributes.value
+        const nextAttributes: Attribute[] = []
+        const { start, end } = sharedSelection.value
+        const types = new Set(typingAttributes.value)
+        const length = text.length - sharedText.value.length
+        const next = text.slice(end, end + length)
+        let currentAttr: Attribute | null = null
+
+        for (const attr of prevAttributes) {
+          const attrEnd = attr.start + attr.length
+
+          if (types.has(attr.type) && attr.start <= start && attrEnd >= end) {
+            types.delete(attr.type)
+
+            if (attr.type === DISPLAY_TYPE.CODE) {
+              if (!next.startsWith("\n")) {
+                if (next.includes("\n")) {
+                  attr.length += next.indexOf("\n")
+                } else {
+                  attr.length += next.length
+                }
+              }
+            } else {
+              attr.length += length
+            }
+          } else if (!types.has(attr.type) && attrEnd === start && length < 0) {
+            if (NEVER_TYPES.includes(attr.type)) {
+              currentAttr = { ...attr }
+            }
+
+            attr.length += length
+          } else if (attr.start >= start) {
+            if (NEVER_TYPES.includes(attr.type)) {
+              currentAttr = { ...attr }
+              continue
+            }
+
+            attr.start += length
+          }
+
+          if (attrEnd > text.length && text.length - attrEnd >= length) {
+            if (NEVER_TYPES.includes(attr.type)) {
+              currentAttr = { ...attr }
+            }
+
+            attr.length = text.length - attr.start
+          }
+
+          if (attr.start < 0 || attr.length <= 0) {
+            continue
+          }
+
+          const prevAttr = nextAttributes.find((prev) => {
+            const prevEnd = prev.start + prev.length
+
+            return attr.type === prev.type && attr.start <= prevEnd
+          })
+
+          if (prevAttr) {
+            prevAttr.length +=
+              prevAttr.start + prevAttr.length - attr.start + attr.length
+            continue
+          }
+
+          nextAttributes.push(attr)
+        }
+
+        if (length > 0) {
+          for (const type of types) {
+            if (type === DISPLAY_TYPE.CODE) {
+              nextAttributes.push({
+                type,
+                content: null,
+                start,
+                length: Math.min(length, Math.max(1, next.indexOf("\n"))),
+              })
+            } else {
+              nextAttributes.push({ type, content: null, start, length })
+            }
+          }
+        }
+
+        sharedText.value = text
+        appliedAttributes.value = nextAttributes.sort(
+          (a, b) => a.start - b.start,
+        )
+
+        runOnJS(emitAttributes)(nextAttributes, currentAttr)
+      },
+      [emitAttributes],
+    )
+
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-        console.log("03 CHANGE EVENT", e.nativeEvent.text)
+        console.log("02 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
 
         const prev = textRef.current
         const attribute = currentAttributeRef.current
@@ -922,128 +1040,21 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           currentAttributeRef.current = null
         }
 
+        runOnRuntime(getWorkletRuntime(), onChangeWorker)(text)
         setValue(text)
         emitValue({ ...e, nativeEvent: { ...e.nativeEvent, text } })
       },
-      [emitValue, setValue],
+      [emitValue, onChangeWorker, setValue],
     )
 
     const parser = useCallback(
       (text: string): MarkdownRange[] => {
         "worklet"
-
-        const attributes: Attribute[] = []
-
-        if (sharedText.value !== text) {
-          console.log("01 PROCESSOR")
-
-          if (sharedSelection.value.end > sharedText.value.length) {
-            sharedSelection.value.start = sharedText.value.length
-            sharedSelection.value.end = sharedText.value.length
-          }
-
-          const { start, end } = sharedSelection.value
-          const types = new Set(typingAttributes.value)
-          const length = text.length - sharedText.value.length
-          const next = text.slice(end, end + length)
-          let currentAttr: Attribute | null = null
-
-          for (const attr of appliedAttributes.value) {
-            const attrEnd = attr.start + attr.length
-
-            if (types.has(attr.type) && attr.start <= start && attrEnd >= end) {
-              types.delete(attr.type)
-
-              if (attr.type === DISPLAY_TYPE.CODE) {
-                if (!next.startsWith("\n")) {
-                  if (next.includes("\n")) {
-                    attr.length += next.indexOf("\n")
-                  } else {
-                    attr.length += next.length
-                  }
-                }
-              } else {
-                attr.length += length
-              }
-            } else if (
-              !types.has(attr.type) &&
-              attrEnd === start &&
-              length < 0
-            ) {
-              if (NEVER_TYPES.includes(attr.type)) {
-                currentAttr = { ...attr }
-              }
-
-              attr.length += length
-            } else if (attr.start >= start) {
-              if (NEVER_TYPES.includes(attr.type)) {
-                currentAttr = { ...attr }
-                continue
-              }
-
-              attr.start += length
-            }
-
-            if (attrEnd > text.length && text.length - attrEnd >= length) {
-              if (NEVER_TYPES.includes(attr.type)) {
-                currentAttr = { ...attr }
-              }
-
-              attr.length = text.length - attr.start
-            }
-
-            if (attr.start < 0 || attr.length <= 0) {
-              continue
-            }
-
-            const prevAttr = attributes.find((prev) => {
-              const prevEnd = prev.start + prev.length
-
-              return attr.type === prev.type && attr.start <= prevEnd
-            })
-
-            if (prevAttr) {
-              prevAttr.length +=
-                prevAttr.start + prevAttr.length - attr.start + attr.length
-              continue
-            }
-
-            attributes.push(attr)
-          }
-
-          if (length > 0) {
-            for (const type of types) {
-              if (type === DISPLAY_TYPE.CODE) {
-                attributes.push({
-                  type,
-                  content: null,
-                  start,
-                  length: Math.min(length, Math.max(1, next.indexOf("\n"))),
-                })
-              } else {
-                attributes.push({
-                  type,
-                  content: null,
-                  start,
-                  length,
-                })
-              }
-            }
-          }
-
-          sharedText.value = text
-          appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
-
-          runOnJS(emitAttributes)(attributes, currentAttr)
-        } else {
-          console.log("01 PARSER")
-
-          attributes.push(...appliedAttributes.value)
-        }
+        console.log("01 PARSER")
 
         const ranges: MarkdownRange[] = []
 
-        for (const attr of attributes) {
+        for (const attr of appliedAttributes.value) {
           const attrEnd = attr.start + attr.length
           let type: MarkdownType
           let start = Math.max(0, attr.start)
@@ -1103,7 +1114,15 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         return ranges
       },
-      [emitAttributes, forceUpdate, mentionTypeWorklet, prefixTrigger.mention],
+      [
+        // Needed when applying attributes outside regular cycle, e.g. formatSelection
+        forceUpdate,
+        // Needed because parser runs before onChangeWorker and latest changes aren't applied on time
+        value,
+        // The rest are used within, so unavoidable
+        mentionTypeWorklet,
+        prefixTrigger.mention,
+      ],
     )
 
     return (
