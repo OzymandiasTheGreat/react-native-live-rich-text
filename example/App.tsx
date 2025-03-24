@@ -77,13 +77,13 @@ export default function App() {
   )
 
   const onChangeText = useCallback((text: string) => {
-    console.log("A2 CHANGE TEXT", JSON.stringify({ text }, null, 2))
+    console.log("A1 CHANGE TEXT", JSON.stringify({ text }, null, 2))
     setText(text)
   }, [])
 
   const onChangePrefix = useCallback(
     (type: DISPLAY_TYPE | null, prefix: string | null) => {
-      // console.log("A4 CHANGE PREFIX", JSON.stringify({ type, prefix }, null, 2))
+      console.log("A3 CHANGE PREFIX", JSON.stringify({ type, prefix }, null, 2))
 
       if (typeof prefix === "string") {
         if (type === DISPLAY_TYPE.MENTION) {
@@ -105,7 +105,7 @@ export default function App() {
   const onSelectionChange = useCallback(
     (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
       console.log(
-        "A3 CHANGE SELECTION",
+        "A2 CHANGE SELECTION",
         JSON.stringify(e.nativeEvent.selection, null, 2),
       )
       setSelection(e.nativeEvent.selection)
@@ -114,13 +114,13 @@ export default function App() {
   )
 
   const onChangeAttributes = useCallback((attrs: Attribute[]) => {
-    console.log("A1 CHANGE ATTRIBUTES", JSON.stringify(attrs, null, 2))
+    console.log("A4 CHANGE ATTRIBUTES", JSON.stringify(attrs, null, 2))
     setAttributes(attrs)
   }, [])
 
   const onChangeTypingAttributes = useCallback(
     (typingAttrs: DISPLAY_TYPE[]) => {
-      console.log("AX TYPING ATTRIBUTES", JSON.stringify(typingAttrs, null, 2))
+      console.log("A5 TYPING ATTRIBUTES", JSON.stringify(typingAttrs, null, 2))
       setFormat(new Set(typingAttrs))
     },
     [],

@@ -59,9 +59,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     ref,
   ) => {
     const inputRef = useRef<MarkdownTextInput>(null)
-    const textRef = useRef("")
+    const valueRef = useRef("")
     const selectionRef = useRef<TextInputSelection>({ start: 0, end: 0 })
-    const attributeRef = useRef<Attribute[]>([])
+    const attributesRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
     const typingAttributesRef = useRef<DISPLAY_TYPE[]>([])
     const emittedTextRef = useRef<string>()
@@ -89,16 +89,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       end: 0,
     })
 
-    const sharedText = useSharedValue("")
-    const sharedSelection = useSharedValue<TextInputSelection>({
-      start: 0,
-      end: 0,
-    })
+    const sharedValue = useSharedValue("")
     const appliedAttributes = useSharedValue<Attribute[]>([])
     const typingAttributes = useSharedValue<DISPLAY_TYPE[]>([])
 
     const setValue = useCallback((value: string) => {
-      textRef.current = value
+      valueRef.current = value
       setValueState(value)
     }, [])
 
@@ -115,7 +111,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         let end = 0
         let prefix = prefixTrigger.mention
 
-        for (const attr of attributeRef.current) {
+        for (const attr of attributesRef.current) {
           const attrEnd = attr.start + attr.length - start
 
           if (
@@ -154,7 +150,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         let length = prefixTrigger.mention.length
 
         if (value.includes(prefixTrigger.mention)) {
-          for (const attr of attributeRef.current) {
+          for (const attr of attributesRef.current) {
             if (attr.type === DISPLAY_TYPE.MENTION) {
               const mention = value.slice(
                 attr.start + length,
@@ -185,7 +181,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         let start = selection.start
         let end = selection.end
 
-        for (const attr of attributeRef.current) {
+        for (const attr of attributesRef.current) {
           if (attr.type === DISPLAY_TYPE.MENTION && attr.start < start) {
             start += length
             end += length
@@ -203,7 +199,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         let start = selection.start
         let end = selection.end
 
-        for (const attr of attributeRef.current) {
+        for (const attr of attributesRef.current) {
           if (
             attr.type === DISPLAY_TYPE.MENTION &&
             attr.start < selection.start
@@ -328,7 +324,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
 
         if (typeof onChangePrefix === "function") {
-          const text = textRef.current
+          const text = valueRef.current
 
           if (Object.values(prefixTrigger).some((t) => text.includes(t))) {
             const { start } = selectionEvent
@@ -341,7 +337,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             const emojiOpen = emojiPosition > spacePosition
 
             if (
-              attributeRef.current.find((attr) => {
+              attributesRef.current.find((attr) => {
                 const attrEnd = attr.start + attr.length
                 const position = Math.max(emojiPosition, mentionPosition)
 
@@ -365,7 +361,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
               if (
                 prefix.length >= prefixMaxLength ||
-                attributeRef.current.find(
+                attributesRef.current.find(
                   (attr) =>
                     attr.type === DISPLAY_TYPE.EMOJI &&
                     attr.start === emojiPosition,
@@ -388,7 +384,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
               if (
                 prefix.length >= prefixMaxLength ||
-                attributeRef.current.find(
+                attributesRef.current.find(
                   (attr) =>
                     attr.type === DISPLAY_TYPE.MENTION &&
                     attr.start === mentionPosition,
@@ -417,11 +413,11 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const emitAttributes = useCallback(
       (attributes: Attribute[]) => {
-        console.log("07 EMIT ATTRIBUTES", JSON.stringify(attributes, null, 2))
+        console.log("04 EMIT ATTRIBUTES", JSON.stringify(attributes, null, 2))
 
         const dehydrated = dehydrateAttributes(attributes)
 
-        attributeRef.current = attributes
+        attributesRef.current = attributes
         emittedAttributesRef.current = dehydrated
         eventCount.current.attributes++
 
@@ -447,13 +443,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (selection: TextInputSelection) => {
         "worklet"
         console.log(
-          "09 TYPING ATTRIBUTES",
+          "05 TYPING ATTRIBUTES",
           JSON.stringify(
             {
               types: typingAttributes.value,
               selection,
               value,
-              prev: sharedText.value,
+              prev: sharedValue.value,
             },
             null,
             2,
@@ -469,9 +465,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             console.log(JSON.stringify({ ...attr, attrEnd }, null, 2))
 
             if (BLOCK_TYPES.includes(attr.type)) {
-              if (value === sharedText.value) {
+              if (value === sharedValue.value) {
                 if (
-                  sharedText.value.charAt(end - 1) === "\n" &&
+                  sharedValue.value.charAt(end - 1) === "\n" &&
                   attr.start <= start &&
                   attrEnd === end
                 ) {
@@ -484,7 +480,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
                   types.add(attr.type)
                 }
               }
-            } else if (value === sharedText.value) {
+            } else if (value === sharedValue.value) {
               if (
                 typingAttributes.value.includes(attr.type) &&
                 attr.start < start &&
@@ -533,8 +529,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           JSON.stringify({ value, selection, attributes }, null, 2),
         )
 
-        sharedText.value = value ?? ""
-        sharedSelection.value = selection ?? { start: 0, end: 0 }
+        sharedValue.value = value ?? ""
         appliedAttributes.value = attributes ?? []
         typingAttributes.value = []
 
@@ -586,15 +581,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     }, [valueProp])
 
     useEffect(() => {
-      console.log(
-        "?? RESET",
-        JSON.stringify(
-          { eventCount: eventCount.current, propCount: propCount.current },
-          null,
-          2,
-        ),
-      )
-
       const {
         attributes: attributesCount,
         selection: selectionCount,
@@ -611,12 +597,21 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         selectionCount < selectionPropCount ||
         valueCount < valuePropCount
       ) {
+        console.log(
+          "?? RESET",
+          JSON.stringify(
+            { eventCount: eventCount.current, propCount: propCount.current },
+            null,
+            2,
+          ),
+        )
+
         propCount.current.attributes = attributesCount
         propCount.current.selection = selectionCount
         propCount.current.value = valueCount
 
         const nextValue =
-          valueProp != null ? hydrateValue(valueProp) : textRef.current
+          valueProp != null ? hydrateValue(valueProp) : valueRef.current
         const intermediateSelection =
           selectionProp != null
             ? hydrateSelection({
@@ -631,7 +626,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         const nextAttributes =
           attributesProp != null
             ? hydrateAttributes(attributesProp)
-            : attributeRef.current
+            : attributesRef.current
 
         setValue(nextValue)
         setSelection(nextSelection)
@@ -647,6 +642,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       hydrateValue,
       resetWorker,
       selectionProp,
+      setSelection,
       setValue,
       valueProp,
     ])
@@ -923,8 +919,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               length: prefix.length + text.length,
             })
 
-            sharedText.value = nextValue
-            sharedSelection.value = nextSelection
+            sharedValue.value = nextValue
             appliedAttributes.value = attributes.sort(
               (a, b) => a.start - b.start,
             )
@@ -967,12 +962,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
         console.log(
-          "03 SELECTION EVENT",
+          "02 SELECTION EVENT",
           JSON.stringify(e.nativeEvent, null, 2),
         )
 
         const selection = { ...e.nativeEvent.selection }
-        const attribute = attributeRef.current.find((attr) => {
+        const attribute = attributesRef.current.find((attr) => {
           const { start, end } = selection
           const attrEnd = attr.start + attr.length
 
@@ -1017,7 +1012,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const onChangeWorker = useCallback(
       (text: string) => {
         "worklet"
-        console.log("06 CHANGE WORKER", { text, value })
+        console.log("03 CHANGE WORKER", { text, value })
 
         const prevAttributes = appliedAttributes.value
         const nextAttributes: Attribute[] = []
@@ -1102,7 +1097,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           calculateTypingAttributesWorker(selection)
         }
 
-        sharedText.value = text
+        sharedValue.value = text
         appliedAttributes.value = nextAttributes.sort(
           (a, b) => a.start - b.start,
         )
@@ -1114,10 +1109,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-        console.log("02 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
+        console.log("01 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
 
         let text = e.nativeEvent.text
-        const prev = textRef.current
+        const prev = valueRef.current
         const length = text.length - prev.length
         const { start } = selection
         const types = new Set(typingAttributesRef.current)
@@ -1128,7 +1123,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           return
         }
 
-        for (const attr of attributeRef.current) {
+        for (const attr of attributesRef.current) {
           const attrEnd = attr.start + attr.length
 
           if (NEVER_TYPES.includes(attr.type)) {
@@ -1161,7 +1156,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const parser = useCallback(
       (text: string): MarkdownRange[] => {
         "worklet"
-        console.log("01 PARSER")
+        console.log("?? PARSER")
 
         const ranges: MarkdownRange[] = []
 
