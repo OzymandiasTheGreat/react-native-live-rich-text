@@ -210,7 +210,7 @@ export default function App() {
               renderItem={renderItem}
               style={styles.autocomplete}
               keyboardDismissMode="none"
-              keyboardShouldPersistTaps
+              keyboardShouldPersistTaps="always"
             />
           )}
           <View style={styles.inputContainer}>

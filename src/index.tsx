@@ -63,6 +63,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const selectionRef = useRef<TextInputSelection>({ start: 0, end: 0 })
     const attributeRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
+    const typingAttributesRef = useRef<DISPLAY_TYPE[]>([])
     const emittedTextRef = useRef<string>()
     const emittedSelectionRef = useRef<TextInputSelection>()
     const emittedAttributesRef = useRef<Attribute[]>()
@@ -415,13 +416,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     )
 
     const emitAttributes = useCallback(
-      (attributes: Attribute[], current: Attribute | null = null) => {
+      (attributes: Attribute[]) => {
         console.log("07 EMIT ATTRIBUTES", JSON.stringify(attributes, null, 2))
 
         const dehydrated = dehydrateAttributes(attributes)
 
         attributeRef.current = attributes
-        currentAttributeRef.current = current
         emittedAttributesRef.current = dehydrated
         eventCount.current.attributes++
 
@@ -430,6 +430,17 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
       },
       [dehydrateAttributes, onChangeAttributes],
+    )
+
+    const emitTypingAttributes = useCallback(
+      (types: DISPLAY_TYPE[]) => {
+        typingAttributesRef.current = types
+
+        if (typeof onChangeTypingAttributes === "function") {
+          onChangeTypingAttributes(types)
+        }
+      },
+      [onChangeTypingAttributes],
     )
 
     const calculateTypingAttributesWorker = useCallback(
@@ -505,11 +516,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           (type) => !NEVER_TYPES.includes(type),
         )
 
-        if (typeof onChangeTypingAttributes === "function") {
-          runOnJS(onChangeTypingAttributes)([...types])
-        }
+        runOnJS(emitTypingAttributes)(typingAttributes.value)
       },
-      [onChangeTypingAttributes, selection, value],
+      [emitTypingAttributes, selection, value],
     )
 
     const resetWorker = useCallback(
@@ -648,60 +657,62 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       runOnRuntime(getWorkletRuntime(), resetWorker)()
     }, [resetWorker, setValue])
 
-    const formatCodeBlockWorker = useCallback((type: DISPLAY_TYPE) => {
-      "worklet"
+    const formatCodeBlockWorker = useCallback(
+      (type: DISPLAY_TYPE) => {
+        "worklet"
 
-      const text = sharedText.value
-      const { start, end } = sharedSelection.value
-      const types = new Set(typingAttributes.value)
-      const prevNewLine = text.lastIndexOf("\n", Math.max(0, start - 1))
-      const nextNewLine = text.indexOf("\n", end)
-      const lineStart = Math.max(0, prevNewLine)
-      const lineEnd = nextNewLine > 0 ? nextNewLine + 1 : text.length
-      const attributesToSplit: Attribute[] = []
-      const attributes = appliedAttributes.value.filter((attr) => {
-        const attrEnd = attr.start + attr.length
+        const { start, end } = selection
+        const types = new Set(typingAttributes.value)
+        const prevNewLine = value.lastIndexOf("\n", Math.max(0, start - 1))
+        const nextNewLine = value.indexOf("\n", end)
+        const lineStart = Math.max(0, prevNewLine)
+        const lineEnd = nextNewLine > 0 ? nextNewLine + 1 : value.length
+        const attributesToSplit: Attribute[] = []
+        const attributes = appliedAttributes.value.filter((attr) => {
+          const attrEnd = attr.start + attr.length
 
-        if (
-          attr.start < lineStart &&
-          attrEnd > lineStart &&
-          attrEnd <= lineEnd
-        ) {
-          attr.length = lineStart - attr.start
-        } else if (
-          attr.start >= lineStart &&
-          attr.start < lineEnd &&
-          attrEnd > lineEnd
-        ) {
-          attr.start = lineEnd
-        } else if (attr.start < lineStart && attrEnd > lineEnd) {
-          attributesToSplit.push(attr)
-          return false
+          if (
+            attr.start < lineStart &&
+            attrEnd > lineStart &&
+            attrEnd <= lineEnd
+          ) {
+            attr.length = lineStart - attr.start
+          } else if (
+            attr.start >= lineStart &&
+            attr.start < lineEnd &&
+            attrEnd > lineEnd
+          ) {
+            attr.start = lineEnd
+          } else if (attr.start < lineStart && attrEnd > lineEnd) {
+            attributesToSplit.push(attr)
+            return false
+          }
+
+          return !(attr.start >= lineStart && attrEnd <= lineEnd)
+        })
+
+        for (const attr of attributesToSplit) {
+          attributes.push({ ...attr, length: lineStart - attr.start })
+          attributes.push({
+            ...attr,
+            start: lineEnd,
+            length: attr.start + attr.length - lineEnd,
+          })
         }
 
-        return !(attr.start >= lineStart && attrEnd <= lineEnd)
-      })
+        if (!types.has(type)) {
+          attributes.push({
+            type,
+            content: null,
+            start: lineStart,
+            length: lineEnd - lineStart,
+          })
+        }
 
-      for (const attr of attributesToSplit) {
-        attributes.push({ ...attr, length: lineStart - attr.start })
-        attributes.push({
-          ...attr,
-          start: lineEnd,
-          length: attr.start + attr.length - lineEnd,
-        })
-      }
-
-      if (!types.has(type)) {
-        attributes.push({
-          type,
-          content: null,
-          start: lineStart,
-          length: lineEnd - lineStart,
-        })
-      }
-
-      appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
-    }, [])
+        appliedAttributes.value = attributes.sort((a, b) => a.start - b.start)
+      },
+      [selection, value],
+    )
 
     const formatSelection = useCallback(
       (type: DISPLAY_TYPE, content: string | null = null) => {
@@ -805,16 +816,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               runOnJS(setForceUpdate)((u) => !u)
             }
 
-            if (typeof onChangeTypingAttributes === "function") {
-              runOnJS(onChangeTypingAttributes)(typingAttributes.value)
-            }
+            runOnJS(emitTypingAttributes)(typingAttributes.value)
           },
         )(type, content)
       },
       [
         calculateTypingAttributesWorker,
+        emitTypingAttributes,
         formatCodeBlockWorker,
-        onChangeTypingAttributes,
         selection,
       ],
     )
@@ -1016,7 +1025,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         const types = new Set(typingAttributes.value)
         const length = text.length - value.length
         const next = text.slice(end, end + length)
-        let currentAttr: Attribute | null = null
         console.log(
           JSON.stringify({ start, end, length, types: [...types] }, null, 2),
         )
@@ -1040,14 +1048,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               attr.length += length
             }
           } else if (!types.has(attr.type) && attrEnd === start && length < 0) {
-            if (NEVER_TYPES.includes(attr.type)) {
-              currentAttr = { ...attr }
-            }
-
             attr.length += length
           } else if (attr.start >= start) {
             if (NEVER_TYPES.includes(attr.type)) {
-              currentAttr = { ...attr }
               continue
             }
 
@@ -1055,10 +1058,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           }
 
           if (attrEnd > text.length && text.length - attrEnd >= length) {
-            if (NEVER_TYPES.includes(attr.type)) {
-              currentAttr = { ...attr }
-            }
-
             attr.length = text.length - attr.start
           }
 
@@ -1108,7 +1107,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           (a, b) => a.start - b.start,
         )
 
-        runOnJS(emitAttributes)(nextAttributes, currentAttr)
+        runOnJS(emitAttributes)(nextAttributes)
       },
       [emitAttributes, selection, value],
     )
@@ -1117,23 +1116,41 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
         console.log("02 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
 
-        const prev = textRef.current
-        const attribute = currentAttributeRef.current
         let text = e.nativeEvent.text
+        const prev = textRef.current
         const length = text.length - prev.length
+        const { start } = selection
+        const types = new Set(typingAttributesRef.current)
+        let currentAttr: Attribute | null = null
 
-        if (length === attribute?.length) {
+        if (length === currentAttributeRef.current?.length) {
           currentAttributeRef.current = null
           return
         }
 
-        if (length < 0 && attribute) {
-          const attrEnd = attribute.start + attribute.length
-          text = prev.slice(0, attribute.start) + prev.slice(attrEnd + 1)
-        } else {
-          currentAttributeRef.current = null
+        for (const attr of attributeRef.current) {
+          const attrEnd = attr.start + attr.length
+
+          if (NEVER_TYPES.includes(attr.type)) {
+            if (!types.has(attr.type) && attrEnd === start && length < 0) {
+              currentAttr = { ...attr }
+            } else if (attr.start >= start) {
+              currentAttr = { ...attr }
+            } else if (
+              attrEnd > text.length &&
+              text.length - attrEnd >= length
+            ) {
+              currentAttr = { ...attr }
+            }
+          }
         }
 
+        if (length < 0 && currentAttr) {
+          const attrEnd = currentAttr.start + currentAttr.length
+          text = prev.slice(0, currentAttr.start) + prev.slice(attrEnd + 1)
+        }
+
+        currentAttributeRef.current = currentAttr
         runOnRuntime(getWorkletRuntime(), onChangeWorker)(text)
         setValue(text)
         emitValue({ ...e, nativeEvent: { ...e.nativeEvent, text } })
