@@ -20,11 +20,14 @@
     "url": "https://tomasrav.me/"
   },
   "license": "Apache-2.0",
-  "dependencies": {},
+  "dependencies": {
+    "emoji-index": "^1.2.0",
+    "emoji-regex": "^10.4.0"
+  },
   "devDependencies": {
-    "@expensify/react-native-live-markdown": "^0.1.254",
+    "@expensify/react-native-live-markdown": "0.1.255",
     "@types/react": "~18.3.12",
-    "expensify-common": "^2.0.126",
+    "expensify-common": "^2.0.127",
     "expo": "~52.0.40",
     "patch-package": "^8.0.0",
     "react-native": "~0.76.7",

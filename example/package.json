@@ -11,7 +11,8 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
-    "@expensify/react-native-live-markdown": "^0.1.254",
+    "@expensify/react-native-live-markdown": "0.1.255",
+    "emoji-index": "^1.2.0",
     "expensify-common": "^2.0.126",
     "expo": "~52.0.40",
     "react": "18.3.1",
