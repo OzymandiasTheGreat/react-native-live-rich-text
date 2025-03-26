@@ -110,13 +110,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     }, [])
 
     const hydrateValue = useCallback(
-      (value: string): string => {
+      (value: string, attributes: Attribute[]): string => {
         const current = currentAttributeRef.current
         let output = ""
         let offset = 0
         let end = 0
 
-        for (const attr of attributesRef.current) {
+        for (const attr of attributes) {
           if (
             current &&
             current.type === attr.type &&
@@ -659,12 +659,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           ),
         )
 
-        propCount.current.attributes = attributesCount
-        propCount.current.selection = selectionCount
-        propCount.current.value = valueCount
-
+        const nextAttributes =
+          attributesProp != null && attributesCount < attributesPropCount
+            ? hydrateAttributes(attributesProp)
+            : attributesRef.current
         const nextValue =
-          valueProp != null ? hydrateValue(valueProp) : valueRef.current
+          valueProp != null
+            ? hydrateValue(valueProp, nextAttributes)
+            : valueRef.current
         const intermediateSelection =
           selectionProp != null
             ? hydrateSelection({
@@ -676,10 +678,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           start: Math.min(intermediateSelection.start, nextValue.length),
           end: Math.min(intermediateSelection.end, nextValue.length),
         }
-        const nextAttributes =
-          attributesProp != null
-            ? hydrateAttributes(attributesProp)
-            : attributesRef.current
+
+        propCount.current.attributes = attributesCount
+        propCount.current.selection = selectionCount
+        propCount.current.value = valueCount
 
         setValue(nextValue)
         setSelection(nextSelection)
