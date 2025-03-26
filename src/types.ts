@@ -36,6 +36,8 @@ export enum MENTION_TYPE {
   THREE,
 }
 
+export type PrefixType = DISPLAY_TYPE.EMOJI | DISPLAY_TYPE.MENTION | null
+
 export interface PrefixTrigger {
   emoji: string
   mention: string
@@ -77,7 +79,7 @@ export interface RichTextInputProps
   mentionTypeWorklet?: (text: string, content: string | null) => MENTION_TYPE
   onChangeAttributes?: (attributes: Attribute[]) => void
   onChangeTypingAttributes?: (typingAttributes: DISPLAY_TYPE[]) => void
-  onChangePrefix?: (type: DISPLAY_TYPE | null, prefix: string | null) => void
+  onChangePrefix?: (type: PrefixType, prefix: string | null) => void
 }
 
 export type RichTextInputRef = MarkdownTextInput & {

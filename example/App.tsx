@@ -104,23 +104,23 @@ export default function App() {
 
   const onSelectionChange = useCallback(
     (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      console.log(
-        "A2 CHANGE SELECTION",
-        JSON.stringify(e.nativeEvent.selection, null, 2),
-      )
+      // console.log(
+      //   "A2 CHANGE SELECTION",
+      //   JSON.stringify(e.nativeEvent.selection, null, 2),
+      // )
       setSelection(e.nativeEvent.selection)
     },
     [],
   )
 
   const onChangeAttributes = useCallback((attrs: Attribute[]) => {
-    console.log("A4 CHANGE ATTRIBUTES", JSON.stringify(attrs, null, 2))
+    // console.log("A4 CHANGE ATTRIBUTES", JSON.stringify(attrs, null, 2))
     setAttributes(attrs)
   }, [])
 
   const onChangeTypingAttributes = useCallback(
     (typingAttrs: DISPLAY_TYPE[]) => {
-      console.log("A5 TYPING ATTRIBUTES", JSON.stringify(typingAttrs, null, 2))
+      // console.log("A5 TYPING ATTRIBUTES", JSON.stringify(typingAttrs, null, 2))
       setFormat(new Set(typingAttrs))
     },
     [],

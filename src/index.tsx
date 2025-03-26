@@ -21,6 +21,8 @@ import {
   MarkdownTextInput,
   type MarkdownType,
 } from "@expensify/react-native-live-markdown"
+import { toEmoji, toShortCode } from "emoji-index"
+import EmojiRegex from "emoji-regex"
 import {
   type Attribute,
   type AttributeStyle,
@@ -31,10 +33,13 @@ import {
   MENTION_TYPE,
   NEVER_TYPES,
   type PrefixTrigger,
+  type PrefixType,
   type RichTextInputProps,
   type RichTextInputRef,
   type TextInputSelection,
 } from "./types"
+
+const emojiRegex = EmojiRegex()
 
 type RichTextInput = ElementRef<typeof RichTextInput>
 
@@ -269,6 +274,98 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       [prefixTrigger.mention],
     )
 
+    const calculatePrefix = useCallback(
+      (
+        text: string | null = null,
+        start: number | null = null,
+      ): [PrefixType, string | null] => {
+        text ??= valueRef.current
+        start ??= selectionRef.current.start
+        let prefixType: PrefixType = null
+        let prefixContent: string | null = null
+
+        if (Object.values(prefixTrigger).some((t) => text.includes(t))) {
+          const emojiTriggerPos = text.lastIndexOf(
+            prefixTrigger.emoji,
+            start - 1,
+          )
+          console.log(JSON.stringify({ start, emojiTriggerPos }, null, 2))
+          const mentionTriggerPos = text.lastIndexOf(
+            prefixTrigger.mention,
+            start - 1,
+          )
+          const nextSpacePos = text.indexOf(" ", start)
+          let currentAttribute: Attribute | null = null
+
+          for (const attr of attributesRef.current) {
+            const attrEnd = attr.start + attr.length
+            const pos = Math.max(emojiTriggerPos, mentionTriggerPos)
+
+            if (
+              EXCLUSIVE_TYPES.includes(attr.type) &&
+              attr.start <= pos &&
+              attrEnd >= start
+            ) {
+              currentAttribute = attr
+              break
+            } else if (
+              attr.type === DISPLAY_TYPE.EMOJI &&
+              attr.start === emojiTriggerPos
+            ) {
+              currentAttribute = attr
+              break
+            } else if (
+              attr.type === DISPLAY_TYPE.MENTION &&
+              attr.start === mentionTriggerPos
+            ) {
+              currentAttribute = attr
+              break
+            }
+          }
+
+          if (!EXCLUSIVE_TYPES.includes(currentAttribute?.type!)) {
+            if (
+              emojiTriggerPos >= 0 &&
+              emojiTriggerPos > nextSpacePos &&
+              emojiTriggerPos > mentionTriggerPos
+            ) {
+              const prefix = text.slice(
+                emojiTriggerPos + prefixTrigger.emoji.length,
+                start,
+              )
+
+              if (
+                prefix.length < prefixMaxLength &&
+                currentAttribute?.type !== DISPLAY_TYPE.EMOJI
+              ) {
+                prefixType = DISPLAY_TYPE.EMOJI
+                prefixContent = prefix
+              }
+            } else if (
+              mentionTriggerPos >= 0 &&
+              mentionTriggerPos > emojiTriggerPos
+            ) {
+              const prefix = text.slice(
+                mentionTriggerPos + prefixTrigger.mention.length,
+                start,
+              )
+
+              if (
+                prefix.length < prefixMaxLength &&
+                currentAttribute?.type !== DISPLAY_TYPE.MENTION
+              ) {
+                prefixType = DISPLAY_TYPE.MENTION
+                prefixContent = prefix
+              }
+            }
+          }
+        }
+
+        return [prefixType, prefixContent]
+      },
+      [prefixMaxLength, prefixTrigger.emoji, prefixTrigger.mention],
+    )
+
     const emitValue = useCallback(
       (e: string | NativeSyntheticEvent<TextInputChangeEventData>) => {
         const value = typeof e === "string" ? e : e.nativeEvent.text
@@ -324,90 +421,15 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
 
         if (typeof onChangePrefix === "function") {
-          const text = valueRef.current
-
-          if (Object.values(prefixTrigger).some((t) => text.includes(t))) {
-            const { start } = selectionEvent
-            const emojiPosition = text.lastIndexOf(prefixTrigger.emoji, start)
-            const mentionPosition = text.lastIndexOf(
-              prefixTrigger.mention,
-              start,
-            )
-            const spacePosition = text.indexOf(" ", start)
-            const emojiOpen = emojiPosition > spacePosition
-
-            if (
-              attributesRef.current.find((attr) => {
-                const attrEnd = attr.start + attr.length
-                const position = Math.max(emojiPosition, mentionPosition)
-
-                return (
-                  EXCLUSIVE_TYPES.includes(attr.type) &&
-                  attr.start <= position &&
-                  attrEnd >= start
-                )
-              })
-            ) {
-              onChangePrefix(null, null)
-            } else if (
-              emojiPosition >= 0 &&
-              emojiOpen &&
-              emojiPosition > mentionPosition
-            ) {
-              const prefix = text.slice(
-                emojiPosition + prefixTrigger.emoji.length,
-                start,
-              )
-
-              if (
-                prefix.length >= prefixMaxLength ||
-                attributesRef.current.find(
-                  (attr) =>
-                    attr.type === DISPLAY_TYPE.EMOJI &&
-                    attr.start === emojiPosition,
-                )
-              ) {
-                onChangePrefix(null, null)
-              } else if (prefix) {
-                onChangePrefix(DISPLAY_TYPE.EMOJI, prefix)
-              } else {
-                onChangePrefix(DISPLAY_TYPE.EMOJI, "")
-              }
-            } else if (
-              mentionPosition >= 0 &&
-              mentionPosition > emojiPosition
-            ) {
-              const prefix = text.slice(
-                mentionPosition + prefixTrigger.mention.length,
-                start,
-              )
-
-              if (
-                prefix.length >= prefixMaxLength ||
-                attributesRef.current.find(
-                  (attr) =>
-                    attr.type === DISPLAY_TYPE.MENTION &&
-                    attr.start === mentionPosition,
-                )
-              ) {
-                onChangePrefix(null, null)
-              } else if (prefix) {
-                onChangePrefix(DISPLAY_TYPE.MENTION, prefix)
-              } else {
-                onChangePrefix(DISPLAY_TYPE.MENTION, "")
-              }
-            }
-          } else {
-            onChangePrefix(null, null)
-          }
+          const [type, prefix] = calculatePrefix(null, selectionEvent.start)
+          onChangePrefix(type, prefix)
         }
       },
       [
+        calculatePrefix,
         dehydrateSelection,
         onChangePrefix,
         onSelectionChangeProp,
-        prefixMaxLength,
-        prefixTrigger,
       ],
     )
 
@@ -442,19 +464,19 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const calculateTypingAttributesWorker = useCallback(
       (selection: TextInputSelection) => {
         "worklet"
-        console.log(
-          "05 TYPING ATTRIBUTES",
-          JSON.stringify(
-            {
-              types: typingAttributes.value,
-              selection,
-              value,
-              prev: sharedValue.value,
-            },
-            null,
-            2,
-          ),
-        )
+        // console.log(
+        //   "05 TYPING ATTRIBUTES",
+        //   JSON.stringify(
+        //     {
+        //       types: typingAttributes.value,
+        //       selection,
+        //       value,
+        //       prev: sharedValue.value,
+        //     },
+        //     null,
+        //     2,
+        //   ),
+        // )
 
         const { start, end } = selection
         const types = new Set<DISPLAY_TYPE>()
@@ -462,7 +484,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         if (start === end) {
           for (const attr of appliedAttributes.value) {
             const attrEnd = attr.start + attr.length
-            console.log(JSON.stringify({ ...attr, attrEnd }, null, 2))
+            // console.log(JSON.stringify({ ...attr, attrEnd }, null, 2))
 
             if (BLOCK_TYPES.includes(attr.type)) {
               if (value === sharedValue.value) {
@@ -524,10 +546,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         attributes?: Attribute[],
       ) => {
         "worklet"
-        console.log(
-          "?X RESET",
-          JSON.stringify({ value, selection, attributes }, null, 2),
-        )
+        // console.log(
+        //   "?X RESET",
+        //   JSON.stringify({ value, selection, attributes }, null, 2),
+        // )
 
         sharedValue.value = value ?? ""
         appliedAttributes.value = attributes ?? []
@@ -597,14 +619,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         selectionCount < selectionPropCount ||
         valueCount < valuePropCount
       ) {
-        console.log(
-          "?? RESET",
-          JSON.stringify(
-            { eventCount: eventCount.current, propCount: propCount.current },
-            null,
-            2,
-          ),
-        )
+        // console.log(
+        //   "?? RESET",
+        //   JSON.stringify(
+        //     { eventCount: eventCount.current, propCount: propCount.current },
+        //     null,
+        //     2,
+        //   ),
+        // )
 
         propCount.current.attributes = attributesCount
         propCount.current.selection = selectionCount
@@ -716,7 +738,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           getWorkletRuntime(),
           (type: DISPLAY_TYPE, content: string | null) => {
             "worklet"
-            console.log("XX FORMAT SELECTION")
+            // console.log("XX FORMAT SELECTION")
 
             const { start, end } = selection
             if (start === end) {
@@ -830,7 +852,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           getWorkletRuntime(),
           (type: DISPLAY_TYPE, text: string, content: string | null) => {
             "worklet"
-            console.log("XX COMPLETE")
+            // console.log("XX COMPLETE")
 
             const { start } = selection
             const appendSpace = !/\s/.test(value.charAt(start))
@@ -1006,22 +1028,26 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         )(selection)
         emitSelection({ ...e, nativeEvent: { ...e.nativeEvent, selection } })
       },
-      [calculateTypingAttributesWorker, , emitSelection],
+      [calculateTypingAttributesWorker, emitSelection, value],
     )
 
     const onChangeWorker = useCallback(
-      (text: string) => {
+      (text: string, extraAttributes: Attribute[]) => {
         "worklet"
-        console.log("03 CHANGE WORKER", { text, value })
+        // console.log("03 CHANGE WORKER", { text, value })
 
         const prevAttributes = appliedAttributes.value
-        const nextAttributes: Attribute[] = []
+        const nextAttributes: Attribute[] = extraAttributes
         const { start, end } = selection
         const types = new Set(typingAttributes.value)
         const length = text.length - value.length
         const next = text.slice(end, end + length)
         console.log(
-          JSON.stringify({ start, end, length, types: [...types] }, null, 2),
+          JSON.stringify(
+            { start, end, length, next, types: [...types] },
+            null,
+            2,
+          ),
         )
 
         for (const attr of prevAttributes) {
@@ -1060,16 +1086,18 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             continue
           }
 
-          const prevAttr = nextAttributes.find((prev) => {
-            const prevEnd = prev.start + prev.length
+          if (!NEVER_TYPES.includes(attr.type)) {
+            const prevAttr = nextAttributes.find((prev) => {
+              const prevEnd = prev.start + prev.length
 
-            return attr.type === prev.type && attr.start <= prevEnd
-          })
+              return attr.type === prev.type && attr.start <= prevEnd
+            })
 
-          if (prevAttr) {
-            prevAttr.length +=
-              prevAttr.start + prevAttr.length - attr.start + attr.length
-            continue
+            if (prevAttr) {
+              prevAttr.length +=
+                prevAttr.start + prevAttr.length - attr.start + attr.length
+              continue
+            }
           }
 
           nextAttributes.push(attr)
@@ -1114,9 +1142,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         let text = e.nativeEvent.text
         const prev = valueRef.current
         const length = text.length - prev.length
-        const { start } = selection
+        const { start, end } = selection
+        const next = text.slice(end, end + length)
         const types = new Set(typingAttributesRef.current)
+        const [type, prefix] = calculatePrefix(text)
+        const extraAttributes: Attribute[] = []
         let currentAttr: Attribute | null = null
+        console.log(JSON.stringify({ next, type, prefix }, null, 2))
 
         if (length === currentAttributeRef.current?.length) {
           currentAttributeRef.current = null
@@ -1146,17 +1178,91 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
 
         currentAttributeRef.current = currentAttr
-        runOnRuntime(getWorkletRuntime(), onChangeWorker)(text)
+
+        if (type === DISPLAY_TYPE.EMOJI && next === prefixTrigger.emoji) {
+          const emoji = toEmoji(prefix)
+
+          if (emoji) {
+            const pos = start - prefixTrigger.emoji.length - prefix!.length
+            text = prev.slice(0, pos) + emoji + " " + prev.slice(start)
+            extraAttributes.push({
+              type: DISPLAY_TYPE.EMOJI,
+              content: prefix,
+              start: pos,
+              length: emoji.length,
+            })
+          }
+        } else if (length > 1) {
+          const shortCodeRegex = new RegExp(
+            prefixTrigger.emoji + "([\\w\\-+]+?)" + prefixTrigger.emoji,
+            "g",
+          )
+          let next = text.slice(end, end + length)
+          let offset = 0
+
+          for (const match of next.matchAll(shortCodeRegex)) {
+            const emoji = toEmoji(match[1])
+
+            next = text.slice(end, end + length)
+
+            if (emoji) {
+              const pos = start + next.indexOf(match[0], offset)
+              console.log(JSON.stringify({ emoji, next, pos }, null, 2))
+              text =
+                text.slice(0, pos) + emoji + text.slice(pos + match[0].length)
+              extraAttributes.push({
+                type: DISPLAY_TYPE.EMOJI,
+                content: match[1],
+                start: pos,
+                length: emoji.length,
+              })
+              offset += pos - start
+            }
+          }
+
+          next = text.slice(end, end + length)
+          offset = 0
+
+          for (const match of next.matchAll(emojiRegex)) {
+            const shortCode = toShortCode(match[0])
+            const pos = start + next.indexOf(match[0], offset)
+
+            if (
+              shortCode &&
+              !extraAttributes.find(
+                (attr) => attr.content === shortCode && attr.start === pos,
+              )
+            ) {
+              extraAttributes.push({
+                type: DISPLAY_TYPE.EMOJI,
+                content: shortCode,
+                start: pos,
+                length: match[0].length,
+              })
+              offset += pos - start
+            }
+          }
+        }
+
+        runOnRuntime(getWorkletRuntime(), onChangeWorker)(text, extraAttributes)
         setValue(text)
         emitValue({ ...e, nativeEvent: { ...e.nativeEvent, text } })
       },
-      [emitValue, onChangeWorker, setValue],
+      [
+        calculatePrefix,
+        emitValue,
+        onChangeWorker,
+        prefixMaxLength,
+        prefixTrigger.emoji,
+        prefixTrigger.mention,
+        setValue,
+      ],
     )
 
     const parser = useCallback(
       (text: string): MarkdownRange[] => {
         "worklet"
-        console.log("?? PARSER")
+        // console.log("?? PARSER")
 
         const ranges: MarkdownRange[] = []
 
@@ -1210,6 +1316,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
                   type = "mention-user"
               }
               break
+            case DISPLAY_TYPE.EMOJI:
+              type = "emoji"
+              break
             default:
               console.error("Unknown Display type")
               continue
@@ -1254,6 +1363,7 @@ export type {
   Attribute,
   AttributeStyle,
   PrefixTrigger,
+  PrefixType,
   RichTextInputProps,
   RichTextInputRef,
   TextInputSelection,
