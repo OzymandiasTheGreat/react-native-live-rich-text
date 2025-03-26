@@ -20,6 +20,7 @@ import {
   type MarkdownStyle,
   MarkdownTextInput,
   type MarkdownType,
+  parseExpensiMark,
 } from "@expensify/react-native-live-markdown"
 import { toEmoji, toShortCode } from "emoji-index"
 import EmojiRegex from "emoji-regex"
@@ -112,13 +113,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (value: string): string => {
         const current = currentAttributeRef.current
         let output = ""
-        let start = 0
+        let offset = 0
         let end = 0
-        let prefix = prefixTrigger.mention
 
         for (const attr of attributesRef.current) {
-          const attrEnd = attr.start + attr.length - start
-
           if (
             current &&
             current.type === attr.type &&
@@ -127,14 +125,24 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             current.length === attr.length
           ) {
             continue
+          } else if (attr.type === DISPLAY_TYPE.EMOJI) {
+            const emoji = toEmoji(attr.content)
+            const shortCode =
+              prefixTrigger.emoji + attr.content + prefixTrigger.emoji
+            output += value.slice(end, attr.start + offset) + emoji
+            offset += shortCode.length - attr.length
+            end = attr.start + attr.length + offset
           } else if (attr.type === DISPLAY_TYPE.MENTION) {
-            const mention = prefix + value.slice(attr.start - start, attrEnd)
-            output += value.slice(end, attr.start - start) + mention
-            start += prefix.length
-          } else {
-            output += value.slice(end, attrEnd)
+            output +=
+              value.slice(end, attr.start + offset) +
+              prefixTrigger.mention +
+              value.slice(
+                attr.start + offset,
+                attr.start + attr.length + offset,
+              )
+            offset -= prefixTrigger.mention.length
+            end = attr.start + attr.length + offset
           }
-          end = attrEnd
         }
 
         if (end > 0) {
@@ -145,28 +153,30 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         return output
       },
-      [prefixTrigger.mention],
+      [prefixTrigger.emoji, prefixTrigger.mention],
     )
 
     const dehydrateValue = useCallback(
       (value: string): string => {
+        const length = prefixTrigger.mention.length
         let output = ""
         let end = 0
-        let length = prefixTrigger.mention.length
 
-        if (value.includes(prefixTrigger.mention)) {
-          for (const attr of attributesRef.current) {
-            if (attr.type === DISPLAY_TYPE.MENTION) {
-              const mention = value.slice(
-                attr.start + length,
-                attr.start + attr.length,
-              )
-              output += value.slice(end, attr.start) + mention
-            } else {
-              output += value.slice(end, attr.start + attr.length)
-            }
-            end = attr.start + attr.length
+        for (const attr of attributesRef.current) {
+          if (attr.type === DISPLAY_TYPE.EMOJI) {
+            const shortCode =
+              prefixTrigger.emoji + attr.content + prefixTrigger.emoji
+            output += value.slice(end, attr.start) + shortCode
+          } else if (attr.type === DISPLAY_TYPE.MENTION) {
+            const mention = value.slice(
+              attr.start + length,
+              attr.start + attr.length,
+            )
+            output += value.slice(end, attr.start) + mention
+          } else {
+            output += value.slice(end, attr.start + attr.length)
           }
+          end = attr.start + attr.length
         }
 
         if (end > 0) {
@@ -177,46 +187,59 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         return output
       },
-      [prefixTrigger.mention],
+      [prefixTrigger.emoji, prefixTrigger.mention],
     )
 
     const hydrateSelection = useCallback(
       (selection: TextInputSelection): TextInputSelection => {
-        const length = prefixTrigger.mention.length
         let start = selection.start
         let end = selection.end
 
         for (const attr of attributesRef.current) {
-          if (attr.type === DISPLAY_TYPE.MENTION && attr.start < start) {
-            start += length
-            end += length
+          if (attr.start <= start) {
+            if (attr.type === DISPLAY_TYPE.EMOJI) {
+              const shortCode =
+                prefixTrigger.emoji + attr.content + prefixTrigger.emoji
+              start -= shortCode.length - attr.length
+              end -= shortCode.length - attr.length
+            } else if (
+              attr.type === DISPLAY_TYPE.MENTION &&
+              attr.start < start
+            ) {
+              start += prefixTrigger.mention.length
+              end += prefixTrigger.mention.length
+            }
           }
         }
 
         return { start, end }
       },
-      [prefixTrigger.mention],
+      [prefixTrigger.emoji, prefixTrigger.mention],
     )
 
     const dehydrateSelection = useCallback(
       (selection: TextInputSelection): TextInputSelection => {
         const length = prefixTrigger.mention.length
-        let start = selection.start
-        let end = selection.end
+        let start = Math.min(selection.start, valueRef.current.length)
+        let end = Math.min(selection.end, valueRef.current.length)
 
         for (const attr of attributesRef.current) {
-          if (
-            attr.type === DISPLAY_TYPE.MENTION &&
-            attr.start < selection.start
-          ) {
-            start -= length
-            end -= length
+          if (attr.start <= selection.start) {
+            if (attr.type === DISPLAY_TYPE.EMOJI) {
+              const shortCode =
+                prefixTrigger.emoji + attr.content + prefixTrigger.emoji
+              start += shortCode.length - attr.length
+              end += shortCode.length - attr.length
+            } else if (attr.type === DISPLAY_TYPE.MENTION) {
+              start -= length
+              end -= length
+            }
           }
         }
 
         return { start, end }
       },
-      [prefixTrigger.mention],
+      [prefixTrigger.emoji, prefixTrigger.mention],
     )
 
     const hydrateAttributes = useCallback(
@@ -238,9 +261,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             current.length === attribute.length
           ) {
             continue
+          } else if (attribute.type === DISPLAY_TYPE.EMOJI) {
+            const emoji = toEmoji(attribute.content)
+            start -= attribute.length - emoji.length
+            attribute.length = emoji.length
           } else if (attribute.type === DISPLAY_TYPE.MENTION) {
-            attribute.length += length
             start += length
+            attribute.length += length
           }
 
           output.push(attribute)
@@ -248,7 +275,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         return output
       },
-      [prefixTrigger.mention],
+      [prefixTrigger.emoji, prefixTrigger.mention],
     )
 
     const dehydrateAttributes = useCallback(
@@ -261,9 +288,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           const attribute = { ...attr }
           attribute.start -= start
 
-          if (attribute.type === DISPLAY_TYPE.MENTION) {
-            attribute.length -= length
+          if (attribute.type === DISPLAY_TYPE.EMOJI) {
+            const shortCode =
+              prefixTrigger.emoji + attribute.content + prefixTrigger.emoji
+            start -= shortCode.length - attribute.length
+            attribute.length = shortCode.length
+          } else if (attribute.type === DISPLAY_TYPE.MENTION) {
             start += length
+            attribute.length -= length
           }
 
           output.push(attribute)
@@ -271,7 +303,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         return output
       },
-      [prefixTrigger.mention],
+      [prefixTrigger.emoji, prefixTrigger.mention],
     )
 
     const calculatePrefix = useCallback(
@@ -289,7 +321,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             prefixTrigger.emoji,
             start - 1,
           )
-          console.log(JSON.stringify({ start, emojiTriggerPos }, null, 2))
           const mentionTriggerPos = text.lastIndexOf(
             prefixTrigger.mention,
             start - 1,
@@ -435,7 +466,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const emitAttributes = useCallback(
       (attributes: Attribute[]) => {
-        console.log("04 EMIT ATTRIBUTES", JSON.stringify(attributes, null, 2))
+        // console.log("04 EMIT ATTRIBUTES", JSON.stringify(attributes, null, 2))
 
         const dehydrated = dehydrateAttributes(attributes)
 
@@ -619,14 +650,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         selectionCount < selectionPropCount ||
         valueCount < valuePropCount
       ) {
-        // console.log(
-        //   "?? RESET",
-        //   JSON.stringify(
-        //     { eventCount: eventCount.current, propCount: propCount.current },
-        //     null,
-        //     2,
-        //   ),
-        // )
+        console.log(
+          "?? RESET",
+          JSON.stringify(
+            { eventCount: eventCount.current, propCount: propCount.current },
+            null,
+            2,
+          ),
+        )
 
         propCount.current.attributes = attributesCount
         propCount.current.selection = selectionCount
@@ -983,10 +1014,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        console.log(
-          "02 SELECTION EVENT",
-          JSON.stringify(e.nativeEvent, null, 2),
-        )
+        // console.log(
+        //   "02 SELECTION EVENT",
+        //   JSON.stringify(e.nativeEvent, null, 2),
+        // )
 
         const selection = { ...e.nativeEvent.selection }
         const attribute = attributesRef.current.find((attr) => {
@@ -1042,17 +1073,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         const types = new Set(typingAttributes.value)
         const length = text.length - value.length
         const next = text.slice(end, end + length)
-        console.log(
-          JSON.stringify(
-            { start, end, length, next, types: [...types] },
-            null,
-            2,
-          ),
-        )
 
         for (const attr of prevAttributes) {
           const attrEnd = attr.start + attr.length
-          console.log(JSON.stringify({ ...attr, attrEnd }, null, 2))
 
           if (types.has(attr.type) && attr.start <= start && attrEnd >= end) {
             types.delete(attr.type)
@@ -1137,18 +1160,17 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-        console.log("01 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
+        // console.log("01 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
 
         let text = e.nativeEvent.text
         const prev = valueRef.current
-        const length = text.length - prev.length
         const { start, end } = selection
-        const next = text.slice(end, end + length)
         const types = new Set(typingAttributesRef.current)
         const [type, prefix] = calculatePrefix(text)
         const extraAttributes: Attribute[] = []
+        const length = text.length - prev.length
+        const next = text.slice(end, end + length)
         let currentAttr: Attribute | null = null
-        console.log(JSON.stringify({ next, type, prefix }, null, 2))
 
         if (length === currentAttributeRef.current?.length) {
           currentAttributeRef.current = null
@@ -1197,53 +1219,42 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             prefixTrigger.emoji + "([\\w\\-+]+?)" + prefixTrigger.emoji,
             "g",
           )
-          let next = text.slice(end, end + length)
+          let emojified = ""
           let offset = 0
 
           for (const match of next.matchAll(shortCodeRegex)) {
             const emoji = toEmoji(match[1])
 
-            next = text.slice(end, end + length)
-
             if (emoji) {
-              const pos = start + next.indexOf(match[0], offset)
-              console.log(JSON.stringify({ emoji, next, pos }, null, 2))
-              text =
-                text.slice(0, pos) + emoji + text.slice(pos + match[0].length)
-              extraAttributes.push({
-                type: DISPLAY_TYPE.EMOJI,
-                content: match[1],
-                start: pos,
-                length: emoji.length,
-              })
-              offset += pos - start
+              const index = next.indexOf(match[0], offset)
+              const prefix = next.slice(offset, index)
+              emojified += prefix + emoji
+              offset += prefix.length + match[0].length
             }
           }
 
-          next = text.slice(end, end + length)
-          offset = 0
+          emojified += next.slice(offset)
+          text = text.slice(0, end) + emojified + text.slice(end + length)
 
-          for (const match of next.matchAll(emojiRegex)) {
-            const shortCode = toShortCode(match[0])
-            const pos = start + next.indexOf(match[0], offset)
-
-            if (
-              shortCode &&
-              !extraAttributes.find(
-                (attr) => attr.content === shortCode && attr.start === pos,
+          for (const range of parseExpensiMark(emojified)) {
+            if (range.type === "emoji") {
+              const shortCode = toShortCode(
+                emojified.slice(range.start, range.start + range.length),
               )
-            ) {
               extraAttributes.push({
                 type: DISPLAY_TYPE.EMOJI,
                 content: shortCode,
-                start: pos,
-                length: match[0].length,
+                start: end + range.start,
+                length: range.length,
               })
-              offset += pos - start
             }
           }
         }
 
+        attributesRef.current = [
+          ...attributesRef.current,
+          ...extraAttributes,
+        ].sort((a, b) => a.start - b.start)
         runOnRuntime(getWorkletRuntime(), onChangeWorker)(text, extraAttributes)
         setValue(text)
         emitValue({ ...e, nativeEvent: { ...e.nativeEvent, text } })

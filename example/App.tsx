@@ -77,13 +77,13 @@ export default function App() {
   )
 
   const onChangeText = useCallback((text: string) => {
-    console.log("A1 CHANGE TEXT", JSON.stringify({ text }, null, 2))
+    // console.log("A1 CHANGE TEXT", JSON.stringify({ text }, null, 2))
     setText(text)
   }, [])
 
   const onChangePrefix = useCallback(
     (type: DISPLAY_TYPE | null, prefix: string | null) => {
-      console.log("A3 CHANGE PREFIX", JSON.stringify({ type, prefix }, null, 2))
+      // console.log("A3 CHANGE PREFIX", JSON.stringify({ type, prefix }, null, 2))
 
       if (typeof prefix === "string") {
         if (type === DISPLAY_TYPE.MENTION) {
