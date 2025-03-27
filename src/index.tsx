@@ -43,6 +43,7 @@ import {
   type Protocol,
   type RichTextInputProps,
   type RichTextInputRef,
+  SUPPORTED_MARKDOWN_TYPES,
   type TextInputSelection,
 } from "./types"
 
@@ -1272,20 +1273,64 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
           emojified += next.slice(offset)
           text = text.slice(0, end) + emojified + text.slice(end + length)
+        }
 
-          for (const range of parseExpensiMark(emojified)) {
-            if (range.type === "emoji") {
-              const shortCode = toShortCode(
-                emojified.slice(range.start, range.start + range.length),
-              )
-              extraAttributes.push({
-                type: DISPLAY_TYPE.EMOJI,
-                content: shortCode,
-                start: end + range.start,
-                length: range.length,
-              })
+        let offset = 0
+
+        for (const range of parseExpensiMark(text)) {
+          if (range.type === "syntax") {
+            text =
+              text.slice(0, range.start - offset) +
+              text.slice(range.start - offset + range.length)
+            offset += range.length
+          } else if (range.type === "emoji") {
+            const shortCode = toShortCode(
+              text.slice(
+                range.start - offset,
+                range.start - offset + range.length,
+              ),
+            )
+            extraAttributes.push({
+              type: DISPLAY_TYPE.EMOJI,
+              content: shortCode,
+              start: range.start - offset,
+              length: range.length,
+            })
+          } else if (SUPPORTED_MARKDOWN_TYPES.includes(range.type)) {
+            let type: DISPLAY_TYPE
+
+            switch (range.type) {
+              case "bold":
+                type = DISPLAY_TYPE.BOLD
+                break
+              case "code":
+                type = DISPLAY_TYPE.CODE
+                break
+              case "italic":
+                type = DISPLAY_TYPE.ITALIC
+                break
+              case "pre":
+                type = DISPLAY_TYPE.CODE_BLOCK
+                break
+              case "strikethrough":
+                type = DISPLAY_TYPE.STRIKE_THROUGH
+                break
+              default:
+                console.error("Unsupported Markdown type")
+                continue
             }
+
+            extraAttributes.push({
+              type,
+              content: null,
+              start: range.start - offset,
+              length: range.length,
+            })
           }
+        }
+
+        if (offset > 0) {
+          pushSelectionRef.current = { start: text.length, end: text.length }
         }
 
         for (const link of linkify.find(text)) {

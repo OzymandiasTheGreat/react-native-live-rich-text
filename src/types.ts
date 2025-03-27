@@ -3,6 +3,7 @@ import type {
   MarkdownStyle,
   MarkdownTextInput,
   MarkdownTextInputProps,
+  MarkdownType,
 } from "@expensify/react-native-live-markdown"
 
 export enum DISPLAY_TYPE {
@@ -16,6 +17,15 @@ export enum DISPLAY_TYPE {
   CODE_BLOCK,
   STRIKE_THROUGH,
 }
+
+export const SUPPORTED_MARKDOWN_TYPES: MarkdownType[] = [
+  "bold",
+  "code",
+  "emoji",
+  "italic",
+  "pre",
+  "strikethrough",
+]
 
 export const BLOCK_TYPES = [DISPLAY_TYPE.CODE_BLOCK]
 export const EXCLUSIVE_TYPES = [
