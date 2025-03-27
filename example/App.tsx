@@ -12,8 +12,11 @@ import {
   View,
 } from "react-native"
 import EmojiData from "emoji-datasource/emoji.json"
-// @ts-ignore
-import { toEmoji, toShortCode } from "emoji-index"
+import {
+  toEmoji as toEmojiOrig,
+  toShortCode as toShortCodeOrig,
+  // @ts-ignore
+} from "emoji-index"
 import RichTextInput, {
   type Attribute,
   DISPLAY_TYPE,
@@ -37,10 +40,15 @@ const MemberList: Member[] = [
 
 type Emoji = { shortCode: string; emoji: string }
 
-const Emojis: Emoji[] = EmojiData.map((e) => ({
-  shortCode: e.short_name,
-  emoji: toEmoji(e.short_name),
-})).sort((a, b) => a.shortCode.localeCompare(b.shortCode))
+const Emojis: Emoji[] = [
+  ...EmojiData.map((e) => ({
+    shortCode: e.short_name,
+    emoji: toEmojiOrig(e.short_name),
+  })),
+  { shortCode: "keet", emoji: ":keet:" },
+  { shortCode: "keet-yay", emoji: ":keet-yay:" },
+  { shortCode: "keetsanta", emoji: ":keetsanta:" },
+].sort((a, b) => a.shortCode.localeCompare(b.shortCode))
 
 const Template1 = {
   text: "Hello, Cruel World!",
@@ -57,6 +65,30 @@ const Template3 = {
     { start: 8, length: 5, type: 4, content: null },
     { start: 15, length: 5, type: 5, content: null },
   ],
+}
+
+function toEmoji(shortCode: string): string {
+  let emoji = toEmojiOrig(shortCode)
+
+  if (emoji) {
+    return emoji
+  }
+
+  emoji = Emojis.find((e) => e.shortCode === shortCode)?.emoji
+
+  return emoji ?? ""
+}
+
+function toShortCode(emoji: string): string {
+  let shortCode = toShortCodeOrig(emoji)
+
+  if (shortCode) {
+    return shortCode
+  }
+
+  shortCode = Emojis.find((e) => e.emoji === emoji)?.shortCode
+
+  return shortCode ?? ""
 }
 
 export default function App() {
@@ -242,6 +274,8 @@ export default function App() {
               ref={ref}
               style={styles.input}
               mentionTypeWorklet={mentionTypeWorklet}
+              toEmoji={toEmoji}
+              toShortCode={toShortCode}
               value={text}
               onChangeText={onChangeText}
               selection={selection}

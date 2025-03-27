@@ -77,6 +77,8 @@ export interface RichTextInputProps
   prefixMaxLength?: number
   prefixTrigger?: PrefixTrigger
   mentionTypeWorklet?: (text: string, content: string | null) => MENTION_TYPE
+  toEmoji?: (shortCode: string) => string
+  toShortCode?: (emoji: string) => string
   onChangeAttributes?: (attributes: Attribute[]) => void
   onChangeTypingAttributes?: (typingAttributes: DISPLAY_TYPE[]) => void
   onChangePrefix?: (type: PrefixType, prefix: string | null) => void

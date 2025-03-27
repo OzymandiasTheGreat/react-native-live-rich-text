@@ -22,8 +22,10 @@ import {
   type MarkdownType,
   parseExpensiMark,
 } from "@expensify/react-native-live-markdown"
-import { toEmoji, toShortCode } from "emoji-index"
-import EmojiRegex from "emoji-regex"
+import {
+  toEmoji as toEmojiOrig,
+  toShortCode as toShortCodeOrig,
+} from "emoji-index"
 import {
   type Attribute,
   type AttributeStyle,
@@ -40,8 +42,6 @@ import {
   type TextInputSelection,
 } from "./types"
 
-const emojiRegex = EmojiRegex()
-
 type RichTextInput = ElementRef<typeof RichTextInput>
 
 const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
@@ -54,6 +54,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       prefixMaxLength = 140,
       prefixTrigger = DEFAULT_PREFIX,
       mentionTypeWorklet = defaultMentionTypeWorklet,
+      toEmoji = toEmojiOrig,
+      toShortCode = toShortCodeOrig,
       onChange: onChangeProp,
       onChangeText: onChangeTextProp,
       onSelectionChange: onSelectionChangeProp,
