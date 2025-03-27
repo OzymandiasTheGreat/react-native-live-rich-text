@@ -880,7 +880,11 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     )
 
     const complete = useCallback(
-      (type: DISPLAY_TYPE, text: string, content: string | null = null) => {
+      (
+        type: NonNullable<PrefixType>,
+        text: string,
+        content: string | null = null,
+      ) => {
         runOnRuntime(
           getWorkletRuntime(),
           (type: DISPLAY_TYPE, text: string, content: string | null) => {
@@ -913,11 +917,15 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
             const nextValue =
               value.slice(0, position) +
-              prefix +
+              (type === DISPLAY_TYPE.EMOJI ? "" : prefix) +
               text +
               (appendSpace ? " " : "") +
               value.slice(start)
-            const nextPosition = position + prefix.length + text.length + 1
+            const nextPosition =
+              position +
+              text.length +
+              (appendSpace ? 1 : 0) +
+              (type === DISPLAY_TYPE.EMOJI ? 0 : prefix.length)
             const nextSelection = { start: nextPosition, end: nextPosition }
             const attributes: Attribute[] = []
 
@@ -971,7 +979,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               type,
               content,
               start: position,
-              length: prefix.length + text.length,
+              length:
+                text.length + (type === DISPLAY_TYPE.EMOJI ? 0 : prefix.length),
             })
 
             sharedValue.value = nextValue

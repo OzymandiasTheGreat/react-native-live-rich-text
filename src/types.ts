@@ -85,5 +85,9 @@ export interface RichTextInputProps
 export type RichTextInputRef = MarkdownTextInput & {
   reset: () => void
   formatSelection: (type: DISPLAY_TYPE, content?: string | null) => void
-  complete: (type: DISPLAY_TYPE, text: string, content?: string | null) => void
+  complete: (
+    type: NonNullable<PrefixType>,
+    text: string,
+    content?: string | null,
+  ) => void
 }

@@ -11,6 +11,9 @@ import {
   type TextInputSelectionChangeEventData,
   View,
 } from "react-native"
+import EmojiData from "emoji-datasource/emoji.json"
+// @ts-ignore
+import { toEmoji, toShortCode } from "emoji-index"
 import RichTextInput, {
   type Attribute,
   DISPLAY_TYPE,
@@ -18,7 +21,9 @@ import RichTextInput, {
   type TextInputSelection,
 } from "react-native-live-rich-text"
 
-const MemberList = [
+type Member = { name: string; id: string }
+
+const MemberList: Member[] = [
   { name: "Admin One", id: "admin1" },
   { name: "Admin Two", id: "admin2" },
   { name: "Admin Three", id: "admin3" },
@@ -29,6 +34,13 @@ const MemberList = [
   { name: "Member Two", id: "peer2" },
   { name: "Member Three", id: "peer3" },
 ]
+
+type Emoji = { shortCode: string; emoji: string }
+
+const Emojis: Emoji[] = EmojiData.map((e) => ({
+  shortCode: e.short_name,
+  emoji: toEmoji(e.short_name),
+})).sort((a, b) => a.shortCode.localeCompare(b.shortCode))
 
 const Template1 = {
   text: "Hello, Cruel World!",
@@ -57,7 +69,7 @@ export default function App() {
   })
   const [format, setFormat] = useState<Set<DISPLAY_TYPE>>(new Set())
   const [autocompleteContent, setAutocompleteContent] = useState<
-    typeof MemberList | string[]
+    Member[] | Emoji[]
   >([])
 
   const mentionTypeWorklet = useCallback(
@@ -91,6 +103,10 @@ export default function App() {
             MemberList.filter((member) =>
               member.name.toLowerCase().startsWith(prefix),
             ),
+          )
+        } else if (type === DISPLAY_TYPE.EMOJI) {
+          setAutocompleteContent(
+            Emojis.filter((emoji) => emoji.shortCode.startsWith(prefix)),
           )
         } else {
           setAutocompleteContent([])
@@ -174,16 +190,22 @@ export default function App() {
   }, [])
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<(typeof MemberList)[0] | string>) => {
-      if (typeof item === "string") {
+    ({ item }: ListRenderItemInfo<Member | Emoji>) => {
+      if ("shortCode" in item) {
         return (
-          <Text
+          <Pressable
+            style={styles.autocompleteRow}
             onPress={() =>
-              ref.current?.complete(DISPLAY_TYPE.EMOJI, item, item)
+              ref.current?.complete(
+                DISPLAY_TYPE.EMOJI,
+                item.emoji,
+                item.shortCode,
+              )
             }
           >
-            {item}
-          </Text>
+            <Text style={styles.emojiPreview}>{item.emoji}</Text>
+            <Text>:{item.shortCode}:</Text>
+          </Pressable>
         )
       } else {
         return (
@@ -302,6 +324,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
   },
+  autocompleteRow: {
+    flexDirection: "row",
+  },
   bold: {
     fontWeight: "bold",
   },
@@ -320,6 +345,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
+  },
+  emojiPreview: {
+    fontSize: 24,
   },
   highlight: {
     backgroundColor: "#cdcdcd",
