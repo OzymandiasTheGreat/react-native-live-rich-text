@@ -482,8 +482,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const emitAttributes = useCallback(
       (attributes: Attribute[]) => {
-        // console.log("04 EMIT ATTRIBUTES", JSON.stringify(attributes, null, 2))
-
         const dehydrated = dehydrateAttributes(attributes)
 
         attributesRef.current = attributes
@@ -511,19 +509,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const calculateTypingAttributesWorker = useCallback(
       (selection: TextInputSelection) => {
         "worklet"
-        // console.log(
-        //   "05 TYPING ATTRIBUTES",
-        //   JSON.stringify(
-        //     {
-        //       types: typingAttributes.value,
-        //       selection,
-        //       value,
-        //       prev: sharedValue.value,
-        //     },
-        //     null,
-        //     2,
-        //   ),
-        // )
 
         const { start, end } = selection
         const types = new Set<DISPLAY_TYPE>()
@@ -531,7 +516,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         if (start === end) {
           for (const attr of appliedAttributes.value) {
             const attrEnd = attr.start + attr.length
-            // console.log(JSON.stringify({ ...attr, attrEnd }, null, 2))
 
             if (BLOCK_TYPES.includes(attr.type)) {
               if (value === sharedValue.value) {
@@ -593,10 +577,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         attributes?: Attribute[],
       ) => {
         "worklet"
-        // console.log(
-        //   "?X RESET",
-        //   JSON.stringify({ value, selection, attributes }, null, 2),
-        // )
 
         sharedValue.value = value ?? ""
         appliedAttributes.value = attributes ?? []
@@ -666,15 +646,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         selectionCount < selectionPropCount ||
         valueCount < valuePropCount
       ) {
-        console.log(
-          "?? RESET",
-          JSON.stringify(
-            { eventCount: eventCount.current, propCount: propCount.current },
-            null,
-            2,
-          ),
-        )
-
         const nextAttributes =
           attributesProp != null && attributesCount < attributesPropCount
             ? hydrateAttributes(attributesProp)
@@ -787,7 +758,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           getWorkletRuntime(),
           (type: DISPLAY_TYPE, content: string | null) => {
             "worklet"
-            // console.log("XX FORMAT SELECTION")
 
             const { start, end } = selection
             if (start === end) {
@@ -905,7 +875,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           getWorkletRuntime(),
           (type: DISPLAY_TYPE, text: string, content: string | null) => {
             "worklet"
-            // console.log("XX COMPLETE")
 
             const { start } = selection
             const appendSpace = !/\s/.test(value.charAt(start))
@@ -1041,11 +1010,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        console.log(
-          "02 SELECTION EVENT",
-          JSON.stringify(e.nativeEvent, null, 2),
-        )
-
         const selection = pushSelectionRef.current ?? {
           ...e.nativeEvent.selection,
         }
@@ -1095,7 +1059,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const onChangeWorker = useCallback(
       (text: string, extraAttributes: Attribute[]) => {
         "worklet"
-        // console.log("03 CHANGE WORKER", { text, value })
 
         const prevAttributes = appliedAttributes.value
         const nextAttributes: Attribute[] = extraAttributes
@@ -1198,8 +1161,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-        console.log("01 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
-
         let text = e.nativeEvent.text
         const prev = valueRef.current
         const { start, end } = selection
@@ -1279,32 +1240,47 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         let offset = 0
 
         for (const range of ranges) {
+          const type = markdown2display(range.type)
+          const current = attributesRef.current.find((attr) => {
+            const attrEnd = attr.start + attr.length + length
+            const start = range.start
+            const end = range.start + range.length
+
+            return attr.start <= start && attrEnd >= end
+          })
+
           if (range.type === "syntax") {
-            const prevCodeBlock = ranges.find(
+            const prev = ranges.find(
               (attr) =>
                 attr.type === "pre" &&
                 attr.start === range.start + range.length,
             )
-            const nextCodeBlock = ranges.find(
+            const next = ranges.find(
               (attr) =>
                 attr.type === "pre" && attr.start + attr.length === range.start,
             )
-            const prev =
-              text.slice(range.start - offset - 1, range.start - offset) ===
-                "\n" && !!prevCodeBlock
-                ? 1
-                : 0
-            const next =
-              text.slice(
-                range.start - offset + range.length,
-                range.start - offset + range.length + 1,
-              ) === "\n" && !!nextCodeBlock
-                ? 1
-                : 0
-            text =
-              text.slice(0, range.start - offset - prev) +
-              text.slice(range.start - offset + range.length + next)
-            offset += range.length + prev + next
+
+            if (
+              !current ||
+              !(prev || next || EXCLUSIVE_TYPES.includes(current.type))
+            ) {
+              const before =
+                text.slice(range.start - offset - 1, range.start - offset) ===
+                  "\n" && !!prev
+                  ? 1
+                  : 0
+              const after =
+                text.slice(
+                  range.start - offset + range.length,
+                  range.start - offset + range.length + 1,
+                ) === "\n" && !!next
+                  ? 1
+                  : 0
+              text =
+                text.slice(0, range.start - offset - before) +
+                text.slice(range.start - offset + range.length + after)
+              offset += range.length + before + after
+            }
           } else if (range.type === "emoji") {
             const shortCode = toShortCode(
               text.slice(
@@ -1319,35 +1295,20 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               length: range.length,
             })
           } else if (SUPPORTED_MARKDOWN_TYPES.includes(range.type)) {
-            let type: DISPLAY_TYPE
-
-            switch (range.type) {
-              case "bold":
-                type = DISPLAY_TYPE.BOLD
-                break
-              case "code":
-                type = DISPLAY_TYPE.CODE
-                break
-              case "italic":
-                type = DISPLAY_TYPE.ITALIC
-                break
-              case "pre":
-                type = DISPLAY_TYPE.CODE_BLOCK
-                break
-              case "strikethrough":
-                type = DISPLAY_TYPE.STRIKE_THROUGH
-                break
-              default:
-                console.error("Unsupported Markdown type")
-                continue
+            if (
+              !current ||
+              !(
+                EXCLUSIVE_TYPES.includes(type!) ||
+                EXCLUSIVE_TYPES.includes(current.type)
+              )
+            ) {
+              extraAttributes.push({
+                type: type!,
+                content: null,
+                start: range.start - offset,
+                length: range.length,
+              })
             }
-
-            extraAttributes.push({
-              type,
-              content: null,
-              start: range.start - offset,
-              length: range.length,
-            })
           }
         }
 
@@ -1398,7 +1359,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const parser = useCallback(
       (text: string): MarkdownRange[] => {
         "worklet"
-        // console.log("?? PARSER")
 
         const ranges: MarkdownRange[] = []
 
@@ -1508,6 +1468,36 @@ export type {
   RichTextInputProps,
   RichTextInputRef,
   TextInputSelection,
+}
+
+function markdown2display(type: MarkdownType): DISPLAY_TYPE | null {
+  switch (type) {
+    case "mention-here":
+    case "mention-report":
+    case "mention-short":
+    case "mention-user":
+      return DISPLAY_TYPE.MENTION
+    case "link":
+      return DISPLAY_TYPE.HTTP_LINK
+    case "bold":
+      return DISPLAY_TYPE.BOLD
+    case "italic":
+      return DISPLAY_TYPE.ITALIC
+    case "code":
+      return DISPLAY_TYPE.CODE
+    case "emoji":
+      return DISPLAY_TYPE.EMOJI
+    case "pre":
+      return DISPLAY_TYPE.CODE_BLOCK
+    case "strikethrough":
+      return DISPLAY_TYPE.STRIKE_THROUGH
+    case "syntax":
+    case "blockquote":
+    case "h1":
+    case "inline-image":
+    default:
+      return null
+  }
 }
 
 function remapAttributeStyles(attributeStyle: AttributeStyle): MarkdownStyle {
