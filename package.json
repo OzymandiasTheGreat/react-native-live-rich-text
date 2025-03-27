@@ -21,7 +21,8 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "emoji-index": "^1.2.0"
+    "emoji-index": "^1.2.0",
+    "linkifyjs": "^4.2.0"
   },
   "devDependencies": {
     "@expensify/react-native-live-markdown": "0.1.255",

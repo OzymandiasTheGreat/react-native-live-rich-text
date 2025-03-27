@@ -16,6 +16,7 @@
     "emoji-index": "^1.2.0",
     "expensify-common": "^2.0.127",
     "expo": "~52.0.41",
+    "linkifyjs": "^4.2.0",
     "react": "18.3.1",
     "react-native": "~0.76.8",
     "react-native-reanimated": "^3.17.1"
