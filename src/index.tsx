@@ -1275,14 +1275,36 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           text = text.slice(0, end) + emojified + text.slice(end + length)
         }
 
+        const ranges = parseExpensiMark(text)
         let offset = 0
 
-        for (const range of parseExpensiMark(text)) {
+        for (const range of ranges) {
           if (range.type === "syntax") {
+            const prevCodeBlock = ranges.find(
+              (attr) =>
+                attr.type === "pre" &&
+                attr.start === range.start + range.length,
+            )
+            const nextCodeBlock = ranges.find(
+              (attr) =>
+                attr.type === "pre" && attr.start + attr.length === range.start,
+            )
+            const prev =
+              text.slice(range.start - offset - 1, range.start - offset) ===
+                "\n" && !!prevCodeBlock
+                ? 1
+                : 0
+            const next =
+              text.slice(
+                range.start - offset + range.length,
+                range.start - offset + range.length + 1,
+              ) === "\n" && !!nextCodeBlock
+                ? 1
+                : 0
             text =
-              text.slice(0, range.start - offset) +
-              text.slice(range.start - offset + range.length)
-            offset += range.length
+              text.slice(0, range.start - offset - prev) +
+              text.slice(range.start - offset + range.length + next)
+            offset += range.length + prev + next
           } else if (range.type === "emoji") {
             const shortCode = toShortCode(
               text.slice(
@@ -1330,7 +1352,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
 
         if (offset > 0) {
-          pushSelectionRef.current = { start: text.length, end: text.length }
+          pushSelectionRef.current = {
+            start: start - offset + length,
+            end: end - offset + length,
+          }
         }
 
         for (const link of linkify.find(text)) {
