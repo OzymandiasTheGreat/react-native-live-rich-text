@@ -21,8 +21,11 @@ import RichTextInput, {
   type Attribute,
   DISPLAY_TYPE,
   MENTION_TYPE,
+  type Protocol,
   type TextInputSelection,
 } from "react-native-live-rich-text"
+
+const Protocols: Protocol[] = [{ scheme: "pear", optionalSlashSlash: false }]
 
 type Member = { name: string; id: string }
 
@@ -162,7 +165,7 @@ export default function App() {
   )
 
   const onChangeAttributes = useCallback((attrs: Attribute[]) => {
-    // console.log("A4 CHANGE ATTRIBUTES", JSON.stringify(attrs, null, 2))
+    console.log("A4 CHANGE ATTRIBUTES", JSON.stringify(attrs, null, 2))
     setAttributes(attrs)
   }, [])
 
@@ -273,6 +276,7 @@ export default function App() {
               multiline
               ref={ref}
               style={styles.input}
+              customLinkProtocols={Protocols}
               mentionTypeWorklet={mentionTypeWorklet}
               toEmoji={toEmoji}
               toShortCode={toShortCode}

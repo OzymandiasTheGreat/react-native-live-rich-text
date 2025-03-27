@@ -20,15 +20,13 @@ export enum DISPLAY_TYPE {
 export const BLOCK_TYPES = [DISPLAY_TYPE.CODE_BLOCK]
 export const EXCLUSIVE_TYPES = [
   DISPLAY_TYPE.MENTION,
+  DISPLAY_TYPE.HTTP_LINK,
+  DISPLAY_TYPE.PEAR_LINK,
   DISPLAY_TYPE.CODE,
   DISPLAY_TYPE.CODE_BLOCK,
 ]
-export const NEVER_TYPES = [
-  DISPLAY_TYPE.MENTION,
-  DISPLAY_TYPE.HTTP_LINK,
-  DISPLAY_TYPE.PEAR_LINK,
-  DISPLAY_TYPE.EMOJI,
-]
+export const LINK_TYPES = [DISPLAY_TYPE.HTTP_LINK, DISPLAY_TYPE.PEAR_LINK]
+export const NEVER_TYPES = [DISPLAY_TYPE.MENTION, DISPLAY_TYPE.EMOJI]
 
 export enum MENTION_TYPE {
   ONE,
@@ -36,12 +34,20 @@ export enum MENTION_TYPE {
   THREE,
 }
 
+export type ManualType =
+  | DISPLAY_TYPE.BOLD
+  | DISPLAY_TYPE.CODE
+  | DISPLAY_TYPE.CODE_BLOCK
+  | DISPLAY_TYPE.ITALIC
+  | DISPLAY_TYPE.STRIKE_THROUGH
 export type PrefixType = DISPLAY_TYPE.EMOJI | DISPLAY_TYPE.MENTION | null
 
 export interface PrefixTrigger {
   emoji: string
   mention: string
 }
+
+export const PEAR_PROTOCOL = "pear://"
 
 export const DEFAULT_PREFIX: PrefixTrigger = {
   emoji: ":",
@@ -67,6 +73,8 @@ export interface AttributeStyle {
   emoji?: MarkdownStyle["emoji"]
 }
 
+export type Protocol = { scheme: string; optionalSlashSlash: boolean }
+
 export interface RichTextInputProps
   extends Omit<
     MarkdownTextInputProps,
@@ -74,6 +82,7 @@ export interface RichTextInputProps
   > {
   attributes?: Attribute[]
   attributeStyle?: AttributeStyle
+  customLinkProtocols?: Protocol[]
   prefixMaxLength?: number
   prefixTrigger?: PrefixTrigger
   mentionTypeWorklet?: (text: string, content: string | null) => MENTION_TYPE
@@ -86,7 +95,7 @@ export interface RichTextInputProps
 
 export type RichTextInputRef = MarkdownTextInput & {
   reset: () => void
-  formatSelection: (type: DISPLAY_TYPE, content?: string | null) => void
+  formatSelection: (type: ManualType, content?: string | null) => void
   complete: (
     type: NonNullable<PrefixType>,
     text: string,

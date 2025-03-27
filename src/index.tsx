@@ -26,6 +26,7 @@ import {
   toEmoji as toEmojiOrig,
   toShortCode as toShortCodeOrig,
 } from "emoji-index"
+import * as linkify from "linkifyjs"
 import {
   type Attribute,
   type AttributeStyle,
@@ -33,10 +34,13 @@ import {
   DEFAULT_PREFIX,
   DISPLAY_TYPE,
   EXCLUSIVE_TYPES,
+  LINK_TYPES,
   MENTION_TYPE,
   NEVER_TYPES,
+  PEAR_PROTOCOL,
   type PrefixTrigger,
   type PrefixType,
+  type Protocol,
   type RichTextInputProps,
   type RichTextInputRef,
   type TextInputSelection,
@@ -51,6 +55,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       selection: selectionProp,
       attributes: attributesProp,
       attributeStyle = {},
+      customLinkProtocols = [],
       prefixMaxLength = 140,
       prefixTrigger = DEFAULT_PREFIX,
       mentionTypeWorklet = defaultMentionTypeWorklet,
@@ -69,6 +74,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const inputRef = useRef<MarkdownTextInput>(null)
     const valueRef = useRef("")
     const selectionRef = useRef<TextInputSelection>({ start: 0, end: 0 })
+    const pushSelectionRef = useRef<TextInputSelection | null>(null)
     const attributesRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
     const typingAttributesRef = useRef<DISPLAY_TYPE[]>([])
@@ -100,6 +106,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const sharedValue = useSharedValue("")
     const appliedAttributes = useSharedValue<Attribute[]>([])
     const typingAttributes = useSharedValue<DISPLAY_TYPE[]>([])
+
+    useEffect(() => {
+      for (const { scheme, optionalSlashSlash } of customLinkProtocols) {
+        linkify.registerCustomProtocol(scheme, optionalSlashSlash)
+      }
+      linkify.init()
+    }, [customLinkProtocols])
 
     const setValue = useCallback((value: string) => {
       valueRef.current = value
@@ -564,7 +577,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
 
         typingAttributes.value = [...types].filter(
-          (type) => !NEVER_TYPES.includes(type),
+          (type) => !NEVER_TYPES.includes(type) && !LINK_TYPES.includes(type),
         )
 
         runOnJS(emitTypingAttributes)(typingAttributes.value)
@@ -1027,12 +1040,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        // console.log(
-        //   "02 SELECTION EVENT",
-        //   JSON.stringify(e.nativeEvent, null, 2),
-        // )
+        console.log(
+          "02 SELECTION EVENT",
+          JSON.stringify(e.nativeEvent, null, 2),
+        )
 
-        const selection = { ...e.nativeEvent.selection }
+        const selection = pushSelectionRef.current ?? {
+          ...e.nativeEvent.selection,
+        }
         const attribute = attributesRef.current.find((attr) => {
           const { start, end } = selection
           const attrEnd = attr.start + attr.length
@@ -1065,6 +1080,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           }
         }
 
+        pushSelectionRef.current = null
         setSelection(selection)
         runOnRuntime(
           getWorkletRuntime(),
@@ -1089,6 +1105,14 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         for (const attr of prevAttributes) {
           const attrEnd = attr.start + attr.length
+
+          if (
+            extraAttributes.find(
+              (extra) => attr.type === extra.type && attr.start === extra.start,
+            )
+          ) {
+            continue
+          }
 
           if (types.has(attr.type) && attr.start <= start && attrEnd >= end) {
             types.delete(attr.type)
@@ -1173,7 +1197,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onChange = useCallback(
       (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
-        // console.log("01 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
+        console.log("01 CHANGE EVENT", JSON.stringify(e.nativeEvent, null, 2))
 
         let text = e.nativeEvent.text
         const prev = valueRef.current
@@ -1264,6 +1288,24 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           }
         }
 
+        for (const link of linkify.find(text)) {
+          const type = link.href.startsWith(PEAR_PROTOCOL)
+            ? DISPLAY_TYPE.PEAR_LINK
+            : DISPLAY_TYPE.HTTP_LINK
+          const length = link.end - link.start
+
+          if (link.start < start && link.end > end) {
+            pushSelectionRef.current = { start: link.end, end: link.end }
+          }
+
+          extraAttributes.push({
+            type,
+            content: link.href,
+            start: link.start,
+            length,
+          })
+        }
+
         attributesRef.current = [
           ...attributesRef.current,
           ...extraAttributes,
@@ -1343,6 +1385,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             case DISPLAY_TYPE.EMOJI:
               type = "emoji"
               break
+            case DISPLAY_TYPE.HTTP_LINK:
+            case DISPLAY_TYPE.PEAR_LINK:
+              type = "link"
+              break
             default:
               console.error("Unknown Display type")
               continue
@@ -1388,6 +1434,7 @@ export type {
   AttributeStyle,
   PrefixTrigger,
   PrefixType,
+  Protocol,
   RichTextInputProps,
   RichTextInputRef,
   TextInputSelection,
