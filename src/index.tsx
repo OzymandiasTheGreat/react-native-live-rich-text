@@ -75,6 +75,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const inputRef = useRef<MarkdownTextInput>(null)
     const valueRef = useRef("")
     const selectionRef = useRef<TextInputSelection>({ start: 0, end: 0 })
+    const iosSelectionOverrideRef = useRef<TextInputSelection | null>(null)
     const pushSelectionRef = useRef<TextInputSelection | null>(null)
     const attributesRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
@@ -1010,9 +1011,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        const selection = pushSelectionRef.current ?? {
-          ...e.nativeEvent.selection,
-        }
+        const selection = pushSelectionRef.current ??
+          iosSelectionOverrideRef.current ?? {
+            ...e.nativeEvent.selection,
+          }
         const attribute = attributesRef.current.find((attr) => {
           const { start, end } = selection
           const attrEnd = attr.start + attr.length
@@ -1053,18 +1055,17 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         )(selection)
         emitSelection({ ...e, nativeEvent: { ...e.nativeEvent, selection } })
       },
-      [calculateTypingAttributesWorker, emitSelection, value],
+      [calculateTypingAttributesWorker, emitSelection, setSelection, value],
     )
 
     const onChangeWorker = useCallback(
-      (text: string, extraAttributes: Attribute[]) => {
+      (text: string, length: number, extraAttributes: Attribute[]) => {
         "worklet"
 
         const prevAttributes = appliedAttributes.value
         const nextAttributes: Attribute[] = extraAttributes
         const { start, end } = selection
         const types = new Set(typingAttributes.value)
-        const length = text.length - value.length
         const next = text.slice(end, end + length)
 
         for (const attr of prevAttributes) {
@@ -1156,7 +1157,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         runOnJS(emitAttributes)(nextAttributes)
       },
-      [emitAttributes, selection, value],
+      [emitAttributes, selection],
     )
 
     const onChange = useCallback(
@@ -1337,11 +1338,16 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           })
         }
 
+        iosSelectionOverrideRef.current = (e.nativeEvent as any).selection
         attributesRef.current = [
           ...attributesRef.current,
           ...extraAttributes,
         ].sort((a, b) => a.start - b.start)
-        runOnRuntime(getWorkletRuntime(), onChangeWorker)(text, extraAttributes)
+        runOnRuntime(getWorkletRuntime(), onChangeWorker)(
+          text,
+          length,
+          extraAttributes,
+        )
         setValue(text)
         emitValue({ ...e, nativeEvent: { ...e.nativeEvent, text } })
       },
