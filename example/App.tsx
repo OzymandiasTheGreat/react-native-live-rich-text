@@ -61,6 +61,21 @@ const AttributeStyle: AttributeStyle = {
   emoji: {
     fontSize: FONT_SIZE,
   },
+  mentionOne: {
+    backgroundColor: "#26D2E820",
+    borderRadius: 4,
+    color: "#26D2E8",
+  },
+  mentionTwo: {
+    backgroundColor: "#F47AFA20",
+    borderRadius: 4,
+    color: "#F47AFA",
+  },
+  mentionThree: {
+    backgroundColor: "#53EA9820",
+    borderRadius: 4,
+    color: "#53EA98",
+  },
 }
 
 type Member = { name: string; id: string }
