@@ -357,13 +357,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               break
             } else if (
               attr.type === DISPLAY_TYPE.EMOJI &&
-              attr.start === emojiTriggerPos
+              attr.start === Math.max(emojiTriggerPos, mentionTriggerPos)
             ) {
               currentAttribute = attr
               break
             } else if (
               attr.type === DISPLAY_TYPE.MENTION &&
-              attr.start === mentionTriggerPos
+              attr.start === Math.max(emojiTriggerPos, mentionTriggerPos)
             ) {
               currentAttribute = attr
               break

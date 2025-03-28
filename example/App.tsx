@@ -150,7 +150,6 @@ function App() {
 
   const onChangePrefix = useCallback(
     (type: DISPLAY_TYPE | null, prefix: string | null) => {
-      console.log({ type, prefix })
       if (typeof prefix === "string") {
         if (type === DISPLAY_TYPE.MENTION) {
           setAutocompleteContent(
