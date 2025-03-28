@@ -2,15 +2,23 @@ import React, { useCallback, useRef, useState } from "react"
 import {
   FlatList,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   type ListRenderItemInfo,
   type NativeSyntheticEvent,
+  Platform,
   Pressable,
-  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   type TextInputSelectionChangeEventData,
   View,
 } from "react-native"
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context"
+import MDI from "@expo/vector-icons/MaterialCommunityIcons"
 import EmojiData from "emoji-datasource/emoji.json"
 import {
   toEmoji as toEmojiOrig,
@@ -19,13 +27,41 @@ import {
 } from "emoji-index"
 import RichTextInput, {
   type Attribute,
+  type AttributeStyle,
   DISPLAY_TYPE,
   MENTION_TYPE,
   type Protocol,
   type TextInputSelection,
 } from "react-native-live-rich-text"
 
+const BACKGROUND_COLOR = "#fafafa"
+const INPUT_COLOR = "#fff"
+const BUTTON_COLOR = "#e0e0e0"
+const TEXT_COLOR = "#212121"
+const PREVIEW_COLOR = "#424242"
+const CODE_BACKGROUND = "#9e9e9e"
+const CODE_COLOR = "#fbc02d"
+const CODE_SIZE = 14
+const FONT_SIZE = 16
+const ICON_SIZE = 24
+const MAX_AUTOCOMPLETE_ITEMS = 12
+
 const Protocols: Protocol[] = [{ scheme: "pear", optionalSlashSlash: false }]
+
+const AttributeStyle: AttributeStyle = {
+  code: {
+    backgroundColor: CODE_BACKGROUND,
+    color: CODE_COLOR,
+    fontSize: CODE_SIZE,
+  },
+  codeBlock: {
+    backgroundColor: CODE_BACKGROUND,
+    fontSize: CODE_SIZE,
+  },
+  emoji: {
+    fontSize: FONT_SIZE,
+  },
+}
 
 type Member = { name: string; id: string }
 
@@ -53,23 +89,6 @@ const Emojis: Emoji[] = [
   { shortCode: "keetsanta", emoji: ":keetsanta:" },
 ].sort((a, b) => a.shortCode.localeCompare(b.shortCode))
 
-const Template1 = {
-  text: "Hello, Cruel World!",
-  attributes: [{ start: 0, length: 5, type: 4, content: null }],
-}
-const Template2 = {
-  text: "Goodbye, Cruel World!",
-  attributes: [{ start: 15, length: 5, type: 5, content: null }],
-}
-const Template3 = {
-  text: "Goodbye Hello, World!",
-  attributes: [
-    { start: 0, length: 7, type: 9, content: null },
-    { start: 8, length: 5, type: 4, content: null },
-    { start: 15, length: 5, type: 5, content: null },
-  ],
-}
-
 function toEmoji(shortCode: string): string {
   let emoji = toEmojiOrig(shortCode)
 
@@ -94,7 +113,7 @@ function toShortCode(emoji: string): string {
   return shortCode ?? ""
 }
 
-export default function App() {
+function App() {
   const ref = useRef<RichTextInput>(null)
   const [text, setText] = useState("")
   const [attributes, setAttributes] = useState<Attribute[]>([])
@@ -106,6 +125,8 @@ export default function App() {
   const [autocompleteContent, setAutocompleteContent] = useState<
     Member[] | Emoji[]
   >([])
+  const [autocompleteOffset, setAutocompleteOffset] = useState(0)
+  const { top } = useSafeAreaInsets()
 
   const mentionTypeWorklet = useCallback(
     (text: string, content: string | null) => {
@@ -129,16 +150,24 @@ export default function App() {
 
   const onChangePrefix = useCallback(
     (type: DISPLAY_TYPE | null, prefix: string | null) => {
+      console.log({ type, prefix })
       if (typeof prefix === "string") {
         if (type === DISPLAY_TYPE.MENTION) {
           setAutocompleteContent(
             MemberList.filter((member) =>
-              member.name.toLowerCase().startsWith(prefix),
+              member.name
+                .toLowerCase()
+                .startsWith(
+                  prefix.toLowerCase().slice(0, MAX_AUTOCOMPLETE_ITEMS),
+                ),
             ),
           )
         } else if (type === DISPLAY_TYPE.EMOJI) {
           setAutocompleteContent(
-            Emojis.filter((emoji) => emoji.shortCode.startsWith(prefix)),
+            Emojis.filter((emoji) => emoji.shortCode.startsWith(prefix)).slice(
+              0,
+              MAX_AUTOCOMPLETE_ITEMS,
+            ),
           )
         } else {
           setAutocompleteContent([])
@@ -183,44 +212,24 @@ export default function App() {
     [],
   )
 
-  const toggleCode = useCallback(
-    () => ref.current?.formatSelection(DISPLAY_TYPE.CODE),
-    [],
-  )
-
   const toggleCodeBlock = useCallback(
     () => ref.current?.formatSelection(DISPLAY_TYPE.CODE_BLOCK),
     [],
   )
 
-  const applyTemplate1 = useCallback(() => {
-    setText(Template1.text)
-    setAttributes(Template1.attributes)
-  }, [])
+  const renderAttributeItem = useCallback(
+    ({ item }: ListRenderItemInfo<Attribute>) => {
+      return <Text style={styles.preview}>{JSON.stringify(item, null, 2)}</Text>
+    },
+    [],
+  )
 
-  const applyTemplate2 = useCallback(() => {
-    setText(Template2.text)
-    setAttributes(Template2.attributes)
-  }, [])
-
-  const applyTemplate3 = useCallback(() => {
-    setText(Template3.text)
-    setAttributes(Template3.attributes)
-  }, [])
-
-  const clear = useCallback(() => {
-    ref.current?.reset()
-    setText("")
-    setAttributes([])
-    setFormat(new Set())
-  }, [])
-
-  const renderItem = useCallback(
+  const renderAutocompleteItem = useCallback(
     ({ item }: ListRenderItemInfo<Member | Emoji>) => {
       if ("shortCode" in item) {
         return (
           <Pressable
-            style={styles.autocompleteRow}
+            style={styles.autocompleteItem}
             onPress={() =>
               ref.current?.complete(
                 DISPLAY_TYPE.EMOJI,
@@ -229,181 +238,211 @@ export default function App() {
               )
             }
           >
-            <Text style={styles.emojiPreview}>{item.emoji}</Text>
-            <Text>:{item.shortCode}:</Text>
+            <Text style={styles.autocompletePreview}>{item.emoji}</Text>
+            <Text style={styles.autocompleteText}>:{item.shortCode}:</Text>
           </Pressable>
         )
       } else {
         return (
-          <Text
+          <Pressable
+            style={styles.autocompleteItem}
             onPress={() =>
               ref.current?.complete(DISPLAY_TYPE.MENTION, item.name, item.id)
             }
           >
-            {item.name}
-          </Text>
+            <Text style={styles.autocompleteText}>{item.name}</Text>
+          </Pressable>
         )
       }
     },
     [],
   )
 
+  const onAutocompleteLayout = useCallback(
+    (e: LayoutChangeEvent) =>
+      setAutocompleteOffset(e.nativeEvent.layout.height),
+    [],
+  )
+
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView>
-        <View>
-          {!!autocompleteContent.length && (
+      <View style={[styles.valuePreview, { marginTop: top }]}>
+        <ScrollView>
+          <Text style={styles.preview}>{text}</Text>
+        </ScrollView>
+      </View>
+      <View style={styles.attributePreview}>
+        <FlatList
+          data={attributes}
+          renderItem={renderAttributeItem}
+          keyboardDismissMode="none"
+          keyboardShouldPersistTaps="always"
+        />
+      </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={-24}
+      >
+        <View style={styles.inputContainer}>
+          <RichTextInput
+            ref={ref}
+            multiline
+            placeholder="Enter text here..."
+            attributeStyle={AttributeStyle}
+            customLinkProtocols={Protocols}
+            value={text}
+            onChangeText={onChangeText}
+            selection={selection}
+            onSelectionChange={onSelectionChange}
+            attributes={attributes}
+            onChangeAttributes={onChangeAttributes}
+            onChangeTypingAttributes={onChangeTypingAttributes}
+            onChangePrefix={onChangePrefix}
+            mentionTypeWorklet={mentionTypeWorklet}
+            toEmoji={toEmoji}
+            toShortCode={toShortCode}
+            style={styles.input}
+          />
+          <View style={styles.toolbar}>
+            <Pressable
+              onPress={toggleBold}
+              style={[
+                styles.button,
+                format.has(DISPLAY_TYPE.BOLD) && styles.highlight,
+              ]}
+            >
+              <MDI name="format-bold" color={TEXT_COLOR} size={ICON_SIZE} />
+            </Pressable>
+            <Pressable
+              onPress={toggleItalic}
+              style={[
+                styles.button,
+                format.has(DISPLAY_TYPE.ITALIC) && styles.highlight,
+              ]}
+            >
+              <MDI name="format-italic" color={TEXT_COLOR} size={ICON_SIZE} />
+            </Pressable>
+            <Pressable
+              onPress={toggleStrikethrough}
+              style={[
+                styles.button,
+                format.has(DISPLAY_TYPE.STRIKE_THROUGH) && styles.highlight,
+              ]}
+            >
+              <MDI
+                name="format-strikethrough"
+                color={TEXT_COLOR}
+                size={ICON_SIZE}
+              />
+            </Pressable>
+            <Pressable
+              onPress={toggleCodeBlock}
+              style={[
+                styles.button,
+                format.has(DISPLAY_TYPE.CODE_BLOCK) && styles.highlight,
+              ]}
+            >
+              <MDI name="code-braces" color={TEXT_COLOR} size={ICON_SIZE} />
+            </Pressable>
+          </View>
+        </View>
+        {!!autocompleteContent.length && (
+          <View
+            style={[styles.autocomplete, { top: -(autocompleteOffset - 8) }]}
+            onLayout={onAutocompleteLayout}
+          >
             <FlatList
               data={autocompleteContent}
-              renderItem={renderItem}
-              style={styles.autocomplete}
+              renderItem={renderAutocompleteItem}
               keyboardDismissMode="none"
               keyboardShouldPersistTaps="always"
             />
-          )}
-          <View style={styles.inputContainer}>
-            <RichTextInput
-              editable
-              multiline
-              ref={ref}
-              style={styles.input}
-              customLinkProtocols={Protocols}
-              mentionTypeWorklet={mentionTypeWorklet}
-              toEmoji={toEmoji}
-              toShortCode={toShortCode}
-              value={text}
-              onChangeText={onChangeText}
-              selection={selection}
-              onSelectionChange={onSelectionChange}
-              attributes={attributes}
-              onChangeAttributes={onChangeAttributes}
-              onChangeTypingAttributes={onChangeTypingAttributes}
-              onChangePrefix={onChangePrefix}
-            />
-            <View style={styles.toolbar}>
-              <Pressable
-                style={[
-                  styles.button,
-                  format.has(DISPLAY_TYPE.BOLD) && styles.highlight,
-                ]}
-                onPress={toggleBold}
-              >
-                <Text style={[styles.label, styles.bold]}>B</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.button,
-                  format.has(DISPLAY_TYPE.ITALIC) && styles.highlight,
-                ]}
-                onPress={toggleItalic}
-              >
-                <Text style={[styles.label, styles.italic]}>I</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.button,
-                  format.has(DISPLAY_TYPE.STRIKE_THROUGH) && styles.highlight,
-                ]}
-                onPress={toggleStrikethrough}
-              >
-                <Text style={[styles.label, styles.strike]}>S</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.button,
-                  format.has(DISPLAY_TYPE.CODE) && styles.highlight,
-                ]}
-                onPress={toggleCode}
-              >
-                <Text style={styles.label}>{"<>"}</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.button,
-                  format.has(DISPLAY_TYPE.CODE_BLOCK) && styles.highlight,
-                ]}
-                onPress={toggleCodeBlock}
-              >
-                <Text style={styles.label}>{"</>"}</Text>
-              </Pressable>
-              <Pressable style={styles.button} onPress={applyTemplate1}>
-                <Text style={styles.label}>1</Text>
-              </Pressable>
-              <Pressable style={styles.button} onPress={applyTemplate2}>
-                <Text style={styles.label}>2</Text>
-              </Pressable>
-              <Pressable style={styles.button} onPress={applyTemplate3}>
-                <Text style={styles.label}>3</Text>
-              </Pressable>
-              <Pressable style={styles.button} onPress={clear}>
-                <Text style={styles.label}>X</Text>
-              </Pressable>
-            </View>
           </View>
-        </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
 
+export default function () {
+  return (
+    <SafeAreaProvider>
+      <App />
+    </SafeAreaProvider>
+  )
+}
+
 const styles = StyleSheet.create({
-  autocomplete: {
-    maxHeight: 96,
-    borderColor: "#000",
-    borderWidth: 1,
-    borderRadius: 8,
+  attributePreview: {
+    borderBottomColor: PREVIEW_COLOR,
+    borderBottomWidth: 1,
+    flex: 1,
   },
-  autocompleteRow: {
+  autocomplete: {
+    backgroundColor: INPUT_COLOR,
+    borderColor: TEXT_COLOR,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 8,
+    position: "absolute",
+    top: 0,
+    width: "100%",
+  },
+  autocompleteItem: {
+    alignItems: "center",
     flexDirection: "row",
   },
-  bold: {
-    fontWeight: "bold",
+  autocompletePreview: {
+    fontSize: ICON_SIZE,
+    marginEnd: 8,
+  },
+  autocompleteText: {
+    color: TEXT_COLOR,
+    fontSize: FONT_SIZE,
   },
   button: {
-    alignItems: "center",
-    backgroundColor: "#efefef",
-    borderColor: "#424242",
-    borderRadius: 4,
-    borderWidth: 1,
+    backgroundColor: INPUT_COLOR,
+    borderRadius: 8,
     height: 24,
-    justifyContent: "center",
     width: 24,
   },
   container: {
+    backgroundColor: BACKGROUND_COLOR,
     flex: 1,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emojiPreview: {
-    fontSize: 24,
+    paddingHorizontal: 16,
   },
   highlight: {
-    backgroundColor: "#cdcdcd",
+    backgroundColor: BUTTON_COLOR,
   },
   input: {
-    flex: 1,
+    color: TEXT_COLOR,
+    fontSize: FONT_SIZE,
   },
   inputContainer: {
-    borderColor: "#555",
+    backgroundColor: INPUT_COLOR,
+    borderColor: TEXT_COLOR,
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
-    height: 96,
-    paddingHorizontal: 4,
-    paddingVertical: 8,
+    padding: 8,
+    marginTop: 8,
+    marginBottom: 24,
   },
-  italic: {
-    fontStyle: "italic",
+  preview: {
+    color: PREVIEW_COLOR,
+    fontSize: FONT_SIZE,
   },
-  label: {
-    fontSize: 20,
-  },
-  strike: {
-    textDecorationLine: "line-through",
+  section: {
+    borderBottomColor: TEXT_COLOR,
+    borderBottomWidth: 1,
   },
   toolbar: {
     flexDirection: "row",
     gap: 8,
+  },
+  valuePreview: {
+    borderBottomColor: PREVIEW_COLOR,
+    borderBottomWidth: 1,
+    height: 64,
   },
 })

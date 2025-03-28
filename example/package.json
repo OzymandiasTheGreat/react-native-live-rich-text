@@ -12,14 +12,15 @@
   },
   "dependencies": {
     "@expensify/react-native-live-markdown": "0.1.255",
+    "@expo/vector-icons": "^14.0.4",
     "emoji-datasource": "^15.1.2",
     "emoji-index": "^1.2.0",
     "expensify-common": "^2.0.127",
     "expo": "~52.0.41",
-    "linkifyjs": "^4.2.0",
     "react": "18.3.1",
     "react-native": "~0.76.8",
-    "react-native-reanimated": "^3.17.1"
+    "react-native-reanimated": "^3.17.1",
+    "react-native-safe-area-context": "^5.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
