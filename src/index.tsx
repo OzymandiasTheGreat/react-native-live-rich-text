@@ -10,6 +10,7 @@ import React, {
 } from "react"
 import {
   type NativeSyntheticEvent,
+  Platform,
   type TextInputChangeEventData,
   type TextInputSelectionChangeEventData,
 } from "react-native"
@@ -75,8 +76,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const inputRef = useRef<MarkdownTextInput>(null)
     const valueRef = useRef("")
     const selectionRef = useRef<TextInputSelection>({ start: 0, end: 0 })
-    const iosSelectionOverrideRef = useRef<TextInputSelection | null>(null)
     const pushSelectionRef = useRef<TextInputSelection | null>(null)
+    const iosSelectionCounter = useRef(0)
     const attributesRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
     const typingAttributesRef = useRef<DISPLAY_TYPE[]>([])
@@ -106,6 +107,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     })
 
     const sharedValue = useSharedValue("")
+    const sharedSelection = useSharedValue<TextInputSelection>({
+      start: 0,
+      end: 0,
+    })
     const appliedAttributes = useSharedValue<Attribute[]>([])
     const typingAttributes = useSharedValue<DISPLAY_TYPE[]>([])
 
@@ -282,6 +287,15 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             const emoji = toEmoji(attribute.content)
             start -= attribute.length - emoji.length
             attribute.length = emoji.length
+
+            for (const parent of output) {
+              if (
+                parent.start <= attribute.start &&
+                attribute.start < parent.start + parent.length
+              ) {
+                parent.length -= attribute.length - emoji.length
+              }
+            }
           } else if (attribute.type === DISPLAY_TYPE.MENTION) {
             start += length
             attribute.length += length
@@ -310,6 +324,16 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               prefixTrigger.emoji + attribute.content + prefixTrigger.emoji
             start -= shortCode.length - attribute.length
             attribute.length = shortCode.length
+
+            for (const parent of output) {
+              if (
+                parent.start <= attribute.start &&
+                attribute.start < parent.start + parent.length
+              ) {
+                parent.length =
+                  attribute.start + attribute.length - parent.start
+              }
+            }
           } else if (attribute.type === DISPLAY_TYPE.MENTION) {
             start += length
             attribute.length -= length
@@ -568,7 +592,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         runOnJS(emitTypingAttributes)(typingAttributes.value)
       },
-      [emitTypingAttributes, selection, value],
+      [emitTypingAttributes, value],
     )
 
     const resetWorker = useCallback(
@@ -710,7 +734,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         const attributes = appliedAttributes.value.filter((attr) => {
           const attrEnd = attr.start + attr.length
 
-          if (
+          if (attr.type === DISPLAY_TYPE.EMOJI) {
+            return true
+          } else if (
             attr.start < lineStart &&
             attrEnd > lineStart &&
             attrEnd <= lineEnd
@@ -854,6 +880,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               runOnJS(setForceUpdate)((u) => !u)
             }
 
+            runOnJS(emitAttributes)(appliedAttributes.value)
             runOnJS(emitTypingAttributes)(typingAttributes.value)
           },
         )(type, content)
@@ -878,6 +905,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
             "worklet"
 
             const { start } = selection
+            const types = new Set(typingAttributes.value)
             const appendSpace = !/\s/.test(value.charAt(start))
             let position: number
             let prefix: string
@@ -957,6 +985,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
                   attributes.push(attr)
                 }
               } else {
+                if (
+                  attr.start <= position &&
+                  attrEnd >= position &&
+                  types.has(attr.type)
+                ) {
+                  attr.length += text.length
+                }
                 attributes.push(attr)
               }
             }
@@ -1011,10 +1046,9 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        const selection = pushSelectionRef.current ??
-          iosSelectionOverrideRef.current ?? {
-            ...e.nativeEvent.selection,
-          }
+        const selection = pushSelectionRef.current ?? {
+          ...e.nativeEvent.selection,
+        }
         const attribute = attributesRef.current.find((attr) => {
           const { start, end } = selection
           const attrEnd = attr.start + attr.length
@@ -1047,12 +1081,22 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           }
         }
 
-        pushSelectionRef.current = null
+        if (Platform.OS === "ios") {
+          iosSelectionCounter.current++
+
+          if (iosSelectionCounter.current % 2) {
+            pushSelectionRef.current = null
+          }
+        } else {
+          pushSelectionRef.current = null
+        }
         setSelection(selection)
-        runOnRuntime(
-          getWorkletRuntime(),
-          calculateTypingAttributesWorker,
-        )(selection)
+        runOnRuntime(getWorkletRuntime(), (selection: TextInputSelection) => {
+          "worklet"
+
+          sharedSelection.value = selection
+          calculateTypingAttributesWorker(selection)
+        })(selection)
         emitSelection({ ...e, nativeEvent: { ...e.nativeEvent, selection } })
       },
       [calculateTypingAttributesWorker, emitSelection, setSelection, value],
@@ -1064,7 +1108,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         const prevAttributes = appliedAttributes.value
         const nextAttributes: Attribute[] = extraAttributes
-        const { start, end } = selection
+        const { start, end } = sharedSelection.value
         const types = new Set(typingAttributes.value)
         const next = text.slice(end, end + length)
 
@@ -1157,7 +1201,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         runOnJS(emitAttributes)(nextAttributes)
       },
-      [emitAttributes, selection],
+      [emitAttributes],
     )
 
     const onChange = useCallback(
@@ -1338,9 +1382,19 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           })
         }
 
-        iosSelectionOverrideRef.current = (e.nativeEvent as any).selection
+        if (!pushSelectionRef.current && "selection" in e.nativeEvent) {
+          pushSelectionRef.current = e.nativeEvent
+            .selection as TextInputSelection
+        }
+
         attributesRef.current = [
-          ...attributesRef.current,
+          ...attributesRef.current.filter(
+            (attr) =>
+              !extraAttributes.find(
+                (extra) =>
+                  attr.type === extra.type && attr.start === extra.start,
+              ),
+          ),
           ...extraAttributes,
         ].sort((a, b) => a.start - b.start)
         runOnRuntime(getWorkletRuntime(), onChangeWorker)(
@@ -1358,6 +1412,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         prefixMaxLength,
         prefixTrigger.emoji,
         prefixTrigger.mention,
+        selection,
         setValue,
       ],
     )
