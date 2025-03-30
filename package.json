@@ -1,10 +1,15 @@
 {
-  "private": true,
   "name": "react-native-live-rich-text",
   "version": "0.1.0",
   "description": "Drop-in replacement for TextInput that provides native WYSIWYG rich text editing",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src",
+    "LICENSE",
+    "NOTICE"
+  ],
   "scripts": {
     "build": "tsc",
     "postinstall": "patch-package"
@@ -12,7 +17,9 @@
   "keywords": [
     "react-native",
     "expo",
-    "react-native-live-rich-text"
+    "react-native-live-rich-text",
+    "rich-text",
+    "wysiwyg-editor"
   ],
   "author": {
     "name": "Tomas Ravinskas",

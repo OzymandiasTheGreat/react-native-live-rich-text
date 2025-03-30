@@ -1527,7 +1527,6 @@ export type {
   PrefixType,
   Protocol,
   RichTextInputProps,
-  RichTextInputRef,
   TextInputSelection,
 }
 
