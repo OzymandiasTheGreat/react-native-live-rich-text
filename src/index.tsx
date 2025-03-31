@@ -9,6 +9,7 @@ import React, {
   useState,
 } from "react"
 import {
+  Platform,
   type GestureResponderEvent,
   type NativeSyntheticEvent,
   type TextInputChangeEventData,
@@ -127,16 +128,28 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       setValueState(value)
     }, [])
 
-    const setSelection = useCallback((selection: TextInputSelection) => {
-      selectionRef.current = selection
-      setSelectionState(selection)
-      runOnRuntime(getWorkletRuntime(), (selection: TextInputSelection) => {
-        "worklet"
+    const setSelection = useCallback(
+      (selection: TextInputSelection, preserveTypingAttributes?: boolean) => {
+        selectionRef.current = selection
+        setSelectionState(selection)
+        runOnRuntime(
+          getWorkletRuntime(),
+          (
+            selection: TextInputSelection,
+            preserveTypingAttributes?: boolean,
+          ) => {
+            "worklet"
 
-        sharedSelection.value = selection
-        calculateTypingAttributesWorker(selection)
-      })(selection)
-    }, [])
+            sharedSelection.value = selection
+
+            if (!preserveTypingAttributes) {
+              calculateTypingAttributesWorker(selection)
+            }
+          },
+        )(selection, preserveTypingAttributes)
+      },
+      [],
+    )
 
     const hydrateValue = useCallback(
       (value: string, attributes: Attribute[]): string => {
@@ -189,6 +202,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       (value: string): string => {
         const length = prefixTrigger.mention.length
         let output = ""
+        let offset = 0
         let end = 0
 
         if (!value) {
@@ -199,17 +213,23 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           if (attr.type === DISPLAY_TYPE.EMOJI) {
             const shortCode =
               prefixTrigger.emoji + attr.content + prefixTrigger.emoji
-            output += value.slice(end, attr.start) + shortCode
+            output =
+              output.slice(0, attr.start + offset) +
+              shortCode +
+              output.slice(attr.start + offset + attr.length)
+            offset += shortCode.length - attr.length
+            end = Math.max(end, attr.start + attr.length)
           } else if (attr.type === DISPLAY_TYPE.MENTION) {
             const mention = value.slice(
               attr.start + length,
               attr.start + attr.length,
             )
             output += value.slice(end, attr.start) + mention
+            end = attr.start + attr.length
           } else {
             output += value.slice(end, attr.start + attr.length)
+            end = attr.start + attr.length
           }
-          end = attr.start + attr.length
         }
 
         if (end > 0) {
@@ -328,7 +348,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
         for (const attr of attributes) {
           const attribute = { ...attr }
-          attribute.start -= start
+          attribute.start -= Math.max(0, start)
 
           if (attribute.type === DISPLAY_TYPE.EMOJI) {
             const shortCode =
@@ -338,6 +358,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
             for (const parent of output) {
               if (
+                !NEVER_TYPES.includes(parent.type) &&
                 parent.start <= attribute.start &&
                 attribute.start < parent.start + parent.length
               ) {
@@ -1020,10 +1041,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
               (a, b) => a.start - b.start,
             )
 
-            calculateTypingAttributesWorker(selection)
-
             runOnJS(setValue)(nextValue)
-            runOnJS(setSelection)(nextSelection)
+            runOnJS(setSelection)(nextSelection, true)
             runOnJS(emitAttributes)(attributes)
             runOnJS(emitValue)(nextValue)
             runOnJS(emitSelection)(nextSelection)
@@ -1057,7 +1076,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-        if (!shouldMoveSelectionRef.current) {
+        if (Platform.OS === "ios" && !shouldMoveSelectionRef.current) {
           return
         }
 
@@ -1226,7 +1245,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         for (const attr of attributesRef.current) {
           const attrEnd = attr.start + attr.length
 
-          if (NEVER_TYPES.includes(attr.type)) {
+          if (
+            NEVER_TYPES.includes(attr.type) &&
+            attr.type !== DISPLAY_TYPE.EMOJI
+          ) {
             if (!types.has(attr.type) && attrEnd === start && length < 0) {
               currentAttr = { ...attr }
             } else if (attr.start >= start) {
@@ -1253,12 +1275,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           if (emoji) {
             const pos = start - prefixTrigger.emoji.length - prefix!.length
             text = prev.slice(0, pos) + emoji + " " + prev.slice(start)
-            extraAttributes.push({
-              type: DISPLAY_TYPE.EMOJI,
-              content: prefix,
-              start: pos,
-              length: emoji.length,
-            })
           }
         } else if (length > 1) {
           const shortCodeRegex = new RegExp(
