@@ -1,5 +1,7 @@
 # react-native-live-rich-text
 
+![android](./screenshots/android.png) ![ios](./screenshots/ios.png)
+
 Native/javascript WYSIWYG rich text editor for `react-native` that also functions as drop-in replacement for `TextInput`.
 Formatted text is rendered natively within the input by `@expensify/react-native-live-markdown` while editor state and logic
 is managed with javascript in worker thread thanks to `react-native-reanimated`. The editor is completely headless, you can
