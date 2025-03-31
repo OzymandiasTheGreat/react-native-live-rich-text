@@ -10,7 +10,6 @@ import React, {
 } from "react"
 import {
   type NativeSyntheticEvent,
-  Platform,
   type TextInputChangeEventData,
   type TextInputSelectionChangeEventData,
 } from "react-native"
@@ -77,7 +76,6 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const valueRef = useRef("")
     const selectionRef = useRef<TextInputSelection>({ start: 0, end: 0 })
     const pushSelectionRef = useRef<TextInputSelection | null>(null)
-    const iosSelectionCounter = useRef(0)
     const attributesRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
     const typingAttributesRef = useRef<DISPLAY_TYPE[]>([])
@@ -129,6 +127,12 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const setSelection = useCallback((selection: TextInputSelection) => {
       selectionRef.current = selection
       setSelectionState(selection)
+      runOnRuntime(getWorkletRuntime(), (selection: TextInputSelection) => {
+        "worklet"
+
+        sharedSelection.value = selection
+        calculateTypingAttributesWorker(selection)
+      })(selection)
     }, [])
 
     const hydrateValue = useCallback(
@@ -1081,22 +1085,8 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
           }
         }
 
-        if (Platform.OS === "ios") {
-          iosSelectionCounter.current++
-
-          if (iosSelectionCounter.current % 2) {
-            pushSelectionRef.current = null
-          }
-        } else {
-          pushSelectionRef.current = null
-        }
+        pushSelectionRef.current = null
         setSelection(selection)
-        runOnRuntime(getWorkletRuntime(), (selection: TextInputSelection) => {
-          "worklet"
-
-          sharedSelection.value = selection
-          calculateTypingAttributesWorker(selection)
-        })(selection)
         emitSelection({ ...e, nativeEvent: { ...e.nativeEvent, selection } })
       },
       [calculateTypingAttributesWorker, emitSelection, setSelection, value],
