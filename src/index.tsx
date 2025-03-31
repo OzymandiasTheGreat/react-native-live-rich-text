@@ -9,6 +9,7 @@ import React, {
   useState,
 } from "react"
 import {
+  type GestureResponderEvent,
   type NativeSyntheticEvent,
   type TextInputChangeEventData,
   type TextInputSelectionChangeEventData,
@@ -65,6 +66,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
       onChange: onChangeProp,
       onChangeText: onChangeTextProp,
       onSelectionChange: onSelectionChangeProp,
+      onTouchMove: onTouchMoveProp,
       onChangeAttributes,
       onChangeTypingAttributes,
       onChangePrefix,
@@ -76,6 +78,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
     const valueRef = useRef("")
     const selectionRef = useRef<TextInputSelection>({ start: 0, end: 0 })
     const pushSelectionRef = useRef<TextInputSelection | null>(null)
+    const shouldMoveSelectionRef = useRef(true)
     const attributesRef = useRef<Attribute[]>([])
     const currentAttributeRef = useRef<Attribute | null>(null)
     const typingAttributesRef = useRef<DISPLAY_TYPE[]>([])
@@ -1050,6 +1053,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
 
     const onSelectionChange = useCallback(
       (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+        if (!shouldMoveSelectionRef.current) {
+          return
+        }
+
         const selection = pushSelectionRef.current ?? {
           ...e.nativeEvent.selection,
         }
@@ -1086,6 +1093,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
 
         pushSelectionRef.current = null
+        shouldMoveSelectionRef.current = false
         setSelection(selection)
         emitSelection({ ...e, nativeEvent: { ...e.nativeEvent, selection } })
       },
@@ -1373,10 +1381,13 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         }
 
         if (!pushSelectionRef.current && "selection" in e.nativeEvent) {
+          // ios selection override, when autocorrect kicks in selection event
+          // contains pre-corrected position, but change event includes correct selection
           pushSelectionRef.current = e.nativeEvent
             .selection as TextInputSelection
         }
 
+        shouldMoveSelectionRef.current = true
         attributesRef.current = [
           ...attributesRef.current.filter(
             (attr) =>
@@ -1405,6 +1416,17 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         selection,
         setValue,
       ],
+    )
+
+    const onTouchMove = useCallback(
+      (e: GestureResponderEvent) => {
+        shouldMoveSelectionRef.current = true
+
+        if (typeof onTouchMoveProp === "function") {
+          onTouchMoveProp(e)
+        }
+      },
+      [onTouchMoveProp],
     )
 
     const parser = useCallback(
@@ -1501,6 +1523,7 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         onChange={onChange}
         selection={selection}
         onSelectionChange={onSelectionChange}
+        onTouchMove={onTouchMove}
       />
     )
   },
