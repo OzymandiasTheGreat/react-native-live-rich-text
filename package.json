@@ -1,6 +1,6 @@
 {
   "name": "react-native-live-rich-text",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Drop-in replacement for TextInput that provides native WYSIWYG rich text editing",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
