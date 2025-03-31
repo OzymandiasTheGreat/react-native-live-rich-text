@@ -191,6 +191,10 @@ const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(
         let output = ""
         let end = 0
 
+        if (!value) {
+          return output
+        }
+
         for (const attr of attributesRef.current) {
           if (attr.type === DISPLAY_TYPE.EMOJI) {
             const shortCode =
