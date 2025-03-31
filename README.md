@@ -7,6 +7,10 @@ Formatted text is rendered natively within the input by `@expensify/react-native
 is managed with javascript in worker thread thanks to `react-native-reanimated`. The editor is completely headless, you can
 specify your own styles for text, and build any kind of UI around it.
 
+## Install
+
+`npm i react-native-live-rich-text`
+
 ## Usage
 
 ```typescript
